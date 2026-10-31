@@ -1,0 +1,73 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 – Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head>
+<body class="bg-slate-50 text-slate-800"><div id="nav"></div>
+<main class="max-w-[1920px] lg:px-6 mx-auto p-3 space-y-4">
+ <section class="hero"><p class="text-xs uppercase tracking-wider opacity-80">Public Health Inspector</p><h1 id="hName" class="text-2xl font-bold">Welcome</h1><p id="hSub" class="text-sm opacity-90"></p>
+  <div class="flex flex-wrap gap-2 mt-3"><a href="inspection.html" class="btn-w">＋ New inspection</a><a href="map.html" class="btn-g">🗺️ Map</a><a href="setup.html" class="btn-g">⚙️ Setup</a></div></section>
+ <div id="welcome"></div>
+ <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="stats"></div>
+
+ <div class="grid xl:grid-cols-2 gap-4 items-start">
+ <div class="card"><div class="p-3 border-b flex flex-wrap gap-2 items-center justify-between"><h3 class="font-semibold">⏰ Visits due (by next date)</h3><div id="dueF" class="flex flex-wrap gap-1 text-xs"></div></div>
+  <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Premise</th><th class="p-2">Grade</th><th class="p-2 hs">Last visit</th><th class="p-2">Next due</th><th class="p-2">Days</th><th class="p-2"></th></tr></thead><tbody id="dueRows" class="divide-y"></tbody></table></div></div>
+
+ <div class="card p-3"><div class="flex flex-wrap items-center gap-2 mb-2"><h3 class="font-semibold">📈 Yearly progress</h3><select id="yr" class="border rounded px-2 py-1 text-sm"></select></div>
+  <div class="grid md:grid-cols-3 gap-4"><div class="md:col-span-2 h-60"><canvas id="cM"></canvas></div><div class="h-60"><canvas id="cG"></canvas></div></div>
+  <div class="overflow-x-auto mt-3"><table class="w-full text-xs text-left"><thead class="bg-slate-50"><tr><th class="p-1">Month</th><th class="p-1">Visits</th><th class="p-1">Avg %</th><th class="p-1">A</th><th class="p-1">B</th><th class="p-1">C</th><th class="p-1">D</th></tr></thead><tbody id="mRows" class="divide-y"></tbody></table></div></div>
+
+ </div>
+ <div class="card"><div class="p-3 flex flex-wrap gap-2 justify-between items-center border-b"><h3 class="font-semibold">🏪 All premises</h3>
+  <div class="flex gap-2"><input id="q" placeholder="Search..." class="border rounded px-2 py-1 text-sm"><button onclick="exportCSV()" class="text-sm border rounded px-2 py-1">Export CSV</button></div></div>
+  <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Premise</th><th class="p-2 hs">Cat.</th><th class="p-2 hs">Date</th><th class="p-2">Score</th><th class="p-2">Grade</th><th class="p-2">Next due</th><th class="p-2"></th></tr></thead><tbody id="rows" class="divide-y"></tbody></table></div></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+let dueF='month',cM,cG;
+const DF=[['over','Overdue'],['week','This week'],['month','This month'],['q','Next 3 months'],['all','All']];
+const badge=g=>`<span class="px-2 py-0.5 rounded-full text-xs font-bold ${G[g].cls}">${g}</span>`;
+function due(){
+ $('dueF').innerHTML=DF.map(f=>`<button onclick="dueF='${f[0]}';due()" class="px-2 py-1 rounded border ${dueF===f[0]?'bg-emerald-600 text-white':''}">${f[1]}</button>`).join('');
+ const ok=d=>dueF==='over'?d<0:dueF==='week'?d>=0&&d<=7:dueF==='month'?d>=0&&d<=30:dueF==='q'?d>=0&&d<=90:true;
+ const L=latest().map(r=>({r,d:daysTo(r.next)})).filter(x=>ok(x.d)).sort((a,b)=>a.d-b.d);
+ $('dueRows').innerHTML=L.map(({r,d})=>`<tr><td class="p-2 font-medium">${esc(r.name)}<div class="text-xs text-slate-500">${esc(r.addr)}</div></td><td class="p-2">${badge(r.grade)}</td><td class="p-2 hs">${r.date}</td>
+  <td class="p-2">${r.next}</td><td class="p-2 ${d<0?'text-rose-600 font-semibold':''}">${d<0?-d+' overdue':d===0?'today':d}</td>
+  <td class="p-2 whitespace-nowrap"><a class="text-emerald-700 mr-2" href="inspection.html?shop=${sidOf(r)}">Inspect</a><a class="text-blue-700" href="shop.html?sid=${sidOf(r)}">Shop</a></td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Nothing due in this range.</td></tr>';
+}
+function year(){
+ const y=$('yr').value,R=recs.filter(r=>r.date.startsWith(y)),mo=[...Array(12)].map(()=>[]);
+ R.forEach(r=>mo[+r.date.slice(5,7)-1].push(r));
+ const avg=a=>a.length?+(a.reduce((s,r)=>s+r.pct,0)/a.length).toFixed(1):null;
+ const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ cM&&cM.destroy();cG&&cG.destroy();
+ cM=new Chart($('cM'),{data:{labels:mn,datasets:[{type:'bar',label:'Visits',data:mo.map(a=>a.length),backgroundColor:'#059669',yAxisID:'y'},{type:'line',label:'Avg %',data:mo.map(avg),borderColor:'#2563eb',yAxisID:'y1',spanGaps:true}]},
+  options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}},y1:{position:'right',min:0,max:100,grid:{drawOnChartArea:false}}}}});
+ const m=new Map();R.forEach(r=>{const k=pk(r);if(!m.has(k)||m.get(k).date<r.date)m.set(k,r)});const LY=[...m.values()];
+ cG=new Chart($('cG'),{type:'doughnut',data:{labels:GRADES.map(x=>x.g),datasets:[{data:GRADES.map(x=>LY.filter(r=>r.grade===x.g).length),backgroundColor:GRADES.map(x=>x.col)}]},options:{maintainAspectRatio:false}});
+ $('mRows').innerHTML=mo.map((a,i)=>`<tr><td class="p-1">${mn[i]}</td><td class="p-1">${a.length}</td><td class="p-1">${avg(a)??'–'}</td>${GRADES.map(x=>`<td class="p-1">${a.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`).join('')
+  +`<tr class="font-semibold bg-slate-50"><td class="p-1">${y}</td><td class="p-1">${R.length}</td><td class="p-1">${avg(R)??'–'}</td>${GRADES.map(x=>`<td class="p-1">${R.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`;
+}
+function render(){
+ const L=latest();
+ const st=(ic,bg,t,v,c)=>`<div class="card stat p-3 flex items-center gap-3"><div class="ic" style="background:${bg};color:${c}">${ic}</div><div><p class="text-[11px] text-slate-500">${t}</p><p class="text-2xl font-bold" style="color:${c}">${v}</p></div></div>`;
+ $('stats').innerHTML=st('🏪','#ccfbf1','Premises',L.length,'#0f766e')+GRADES.map(x=>st(x.g,x.col+'33',`Grade ${x.g} · ${rangeTxt(x.g)}`,L.filter(r=>r.grade===x.g).length,x.col)).join('');
+ const q=$('q').value.toLowerCase();
+ $('rows').innerHTML=L.filter(r=>(r.name+r.owner+(r.addr||'')).toLowerCase().includes(q)).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr class="hover:bg-slate-50"><td class="p-2 font-medium">${esc(r.name)}<div class="text-xs text-slate-500">${esc(r.owner)}</div></td><td class="p-2 hs">${r.cat}</td><td class="p-2 hs">${r.date}</td><td class="p-2">${r.pct}%</td><td class="p-2">${badge(r.grade)}</td>
+  <td class="p-2 ${r.next<today()?'text-rose-600 font-semibold':''}">${r.next}</td><td class="p-2 whitespace-nowrap"><a class="text-emerald-700 mr-2" href="shop.html?sid=${sidOf(r)}">Progress / QR</a><a class="text-blue-700 mr-2" href="report.html?id=${r.id}">Report</a><a class="text-slate-700" href="inspection.html?shop=${sidOf(r)}">Inspect</a></td></tr>`).join('')
+  ||'<tr><td colspan="7" class="p-6 text-center text-slate-400">No inspections yet – use “New Inspection”.</td></tr>';
+}
+function exportCSV(){
+ const h=['Date','Premise','Category','Address','Owner','NIC','Tel','Total','Denominator','Percent','Grade','NextDue','Remark'],q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const csv=[h.join(',')].concat(recs.map(r=>[r.date,r.name,r.cat,r.addr,r.owner,r.nic,r.tel,r.total,r.denom,r.pct,r.grade,r.next,r.remark].map(q).join(','))).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='h800_records.csv';a.click();
+}
+boot('d',()=>{
+ const ys=[...new Set(recs.map(r=>r.date.slice(0,4)).concat(today().slice(0,4)))].sort().reverse();
+ $('yr').innerHTML=ys.map(y=>`<option>${y}</option>`).join('');$('yr').onchange=year;$('q').oninput=render;
+ render();due();year();
+ const S=window.H800_SET||{},L=latest(),ov=L.filter(r=>daysTo(r.next)<0).length,wk=L.filter(r=>{const d=daysTo(r.next);return d>=0&&d<=7}).length;
+ $('hName').textContent=S.phi||'Welcome';$('hSub').textContent=(S.office?S.office+' · ':'')+`${L.length} premises · ${wk} due this week · ${ov} overdue`;
+ if(!S.office&&!FB_ON)$('welcome').innerHTML='<div class="card p-4 border-amber-300"><b>👋 First time here?</b> Open <a class="text-emerald-700 underline" href="setup.html">Setup</a> to add your area name, Firebase and area GeoJSON – takes 2 minutes.</div>';
+});
+</script></body></html>

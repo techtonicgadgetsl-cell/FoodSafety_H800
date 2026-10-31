@@ -1,0 +1,112 @@
+/* Shared: form definition, grading, storage, area GeoJSON, nav */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---- Grades: EDIT mark ranges here (min % of each grade, highest first) ---- */
+const GRADES=[
+ {g:'A',min:75,max:100,name:'Good',months:3,col:'#10b981',cls:'bg-emerald-100 text-emerald-700'},
+ {g:'B',min:50,max:74,name:'Satisfactory',months:2,col:'#f59e0b',cls:'bg-amber-100 text-amber-700'},
+ {g:'C',min:25,max:49,name:'Unsatisfactory',months:1,col:'#ea580c',cls:'bg-orange-100 text-orange-700'},
+ {g:'D',min:0,max:24,name:'Very unsatisfactory',months:1,col:'#e11d48',cls:'bg-rose-100 text-rose-700'}
+];
+const G=Object.fromEntries(GRADES.map(x=>[x.g,x]));
+const gradeOf=p=>GRADES.find(x=>p>=x.min).g;
+const rangeTxt=g=>`${G[g].min}–${G[g].max}%`;
+
+/* ---- Form definition (official H800 revised 2022) ---- */
+const YN5=[[5,'5 – Yes'],[0,'0 – No']];
+const G3=[[4,'4 – Satisfactory'],[2,'2 – Partly'],[0,'0 – Unsatisfactory']];
+const H3=[[4,'4 – No defects'],[2,'2 – One type of defect'],[0,'0 – Manufacturing & maintenance defects']];
+const P3=[[5,'5 – More than 75%'],[2,'2 – 50–75%'],[0,'0 – Less than 50%']];
+const YN2=[[2,'2 – Yes'],[0,'0 – No']];
+const SECS=[
+ {id:'g',t:'1. General',na:{l:'No need to be registered (registration items not applicable)',keys:['g1','g2']},items:[
+  ['g1','Premises registered under the regulation',YN5],['g2','Registration certificate displayed',YN5],
+  ['g3','Not convicted within one year',YN5],['g4','Food not destroyed within one year',YN5]]},
+ {id:'b',t:'2. Building',items:[
+  ['b1','Safe water',[[4,'4 – Safe'],[0,'0 – Unsafe']]],['b2','Cleanliness and cleaning',G3],
+  ['b3','Pests and animals',[[4,'4 – None'],[2,'2 – Other pests/animals'],[0,'0 – Cockroach / rat / animal present']]],
+  ['b4','Sound pollution',[[4,'4 – Normal voice heard beyond 1 m'],[2,'2 – Only within 1 m'],[0,'0 – Only very close']]],
+  ['b5','Toilet’s cleanliness',[[4,'4 – Clean / toilet not necessary'],[2,'2 – Water & soap but dirt/smell'],[0,'0 – No water or soap']]]]},
+ {id:'h',t:'3. Food handler',items:[
+  ['h1','Medical certificates',P3],['h2','Hair net / head cap, mask, gloves, slippers / shoes',P3],
+  ['h3','Unhygienic behaviour (eating, chewing, smoking, spitting)',[[5,'5 – No one'],[2,'2 – Less than 50%'],[0,'0 – More than 50%']]],
+  ['h4','Use clean utensils to serve food',P3]]},
+ {id:'p',t:'4. Processing and/or serving area',items:[
+  ['p1','Walls hygienic',H3],['p2','Floor hygienic',H3],['p3','Ceiling hygienic',H3],['p4','Food contactable surfaces hygienic',H3],
+  ['p5','Waste water (sanitary disposal)',YN2],['p6','Waste bins all closed',YN2]]},
+ {id:'s',t:'5. Food storage',na:{l:'No storage of cooked food',keys:['s1','s2','s3','s4']},items:[
+  ['s1','Cooked perishable food kept closed',G3],['s2','2/4 temperature rule',G3],['s3','Stored in food grade container',G3],
+  ['s4','Contamination prevented (cooked food)',G3],['s5','Uncooked food – contamination prevented',G3]]}
+];
+const maxOf=i=>Math.max(...i[2].map(o=>o[0]));
+
+/* ---- Records (localStorage) ---- */
+let recs=[];try{recs=JSON.parse(localStorage.getItem('h800_records_v2'))||[]}catch(e){}
+const persist=()=>{try{localStorage.setItem('h800_records_v2',JSON.stringify(recs))}catch(e){}};
+const pk=r=>(r.name+'|'+(r.addr||'')).toLowerCase();
+const addMonths=(d,m)=>{const x=new Date(d);x.setMonth(x.getMonth()+m);return x.toISOString().slice(0,10)};
+const today=()=>new Date().toISOString().slice(0,10);
+const latest=()=>{const m=new Map();recs.forEach(r=>{const k=pk(r);if(!m.has(k)||m.get(k).date<r.date)m.set(k,r)});return [...m.values()]};
+
+/* ---- Area GeoJSON: geo-data.js first, else saved once in IndexedDB ---- */
+const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('h800',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+async function kvGet(k){try{const d=await idb();return await new Promise(res=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(null)})}catch(e){return null}}
+async function kvSet(k,v){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+async function kvDel(k){const d=await idb();return new Promise(res=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=res})}
+async function getGeo(){return window.AREA_GEOJSON||await kvGet('area')}
+async function addArea(map){
+ const g=await getGeo();if(!g)return null;
+ return L.geoJSON(g,{style:{color:'#1d4ed8',weight:2,fillColor:'#3b82f6',fillOpacity:.08},
+  onEachFeature:(f,ly)=>{const p=f.properties||{},n=p.GND_N||p.name||p.NAME;if(n)ly.bindTooltip(String(n),{sticky:true})}}).addTo(map);
+}
+const tile=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'});
+
+/* ---- Helpers ---- */
+const sidOf=r=>{let h=5381;const s=pk(r);for(let i=0;i<s.length;i++)h=(h*33^s.charCodeAt(i))>>>0;return h.toString(36)};
+const shopUrl=sid=>(window.APP_URL||location.href.replace(/[^\/]*([?#].*)?$/,'')).replace(/\/?$/,'/')+'inspection.html?shop='+sid;
+const daysTo=d=>Math.round((new Date(d)-new Date(today()))/864e5);
+const secPct=(r,s)=>{const v=r.subs&&r.subs[s.id];return v&&typeof v==='object'&&v.on!==false&&v.m?v.t/v.m*100:null};
+const shopRecs=sid=>recs.filter(r=>sidOf(r)===sid).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+
+/* ---- Firebase (optional: fill firebase-config.js) ---- */
+const FB_ON=!!(window.FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey&&window.firebase);
+let auth=null,db=null;
+if(FB_ON){firebase.initializeApp(FIREBASE_CONFIG);auth=firebase.auth();db=firebase.firestore()}
+const COL='h800_records';
+const saveRec=async r=>{persist();if(FB_ON)await db.collection(COL).doc(String(r.id)).set(r)};
+const delRec=async id=>{recs=recs.filter(x=>x.id!==id);persist();if(FB_ON)await db.collection(COL).doc(String(id)).delete()};
+function loginUI(){return new Promise(res=>{
+ const d=document.createElement('div');d.className='fixed inset-0 bg-slate-900/80 z-[5000] flex items-center justify-center p-3';
+ d.innerHTML=`<div class="bg-white rounded-xl p-5 w-full max-w-sm space-y-3"><h2 class="font-bold text-lg">H800 – Staff login</h2>
+ <input id="lg_e" type="email" placeholder="E-mail" class="w-full border rounded p-2"><input id="lg_p" type="password" placeholder="Password" class="w-full border rounded p-2">
+ <p id="lg_m" class="text-xs text-rose-600"></p><button id="lg_b" class="w-full bg-emerald-600 text-white rounded p-2 font-medium">Sign in</button></div>`;
+ document.body.appendChild(d);
+ const go=async()=>{try{await auth.signInWithEmailAndPassword($('lg_e').value.trim(),$('lg_p').value);d.remove();res()}catch(e){$('lg_m').textContent='Login failed: '+e.message}};
+ $('lg_b').onclick=go;$('lg_p').onkeydown=e=>{if(e.key==='Enter')go()};
+})}
+async function boot(active,fn){
+ nav(active);
+ if(FB_ON){
+  await new Promise(r=>{const u=auth.onAuthStateChanged(()=>{u();r()})});
+  if(!auth.currentUser)await loginUI();
+  try{
+   const cloud=(await db.collection(COL).get()).docs.map(d=>d.data()),ids=new Set(cloud.map(r=>r.id));
+   let extra=[];
+   if(!localStorage.getItem('h800_migrated')){extra=recs.filter(r=>!ids.has(r.id));for(const r of extra)await db.collection(COL).doc(String(r.id)).set(r);localStorage.setItem('h800_migrated','1')}
+   recs=cloud.concat(extra);persist();
+  }catch(e){alert('Could not load data: '+e.message)}
+ }
+ fn();
+}
+
+/* ---- Nav ---- */
+function nav(a){
+ const L=[['index.html','🏠','Dashboard','d'],['inspection.html','➕','Inspect','i'],['map.html','🗺️','Map','m'],['setup.html','⚙️','Setup','s']],S=window.H800_SET||{};
+ const so=FB_ON?`<button onclick="auth.signOut().then(()=>location.reload())" class="px-3 py-1.5 rounded-lg bg-white/15 text-sm">Sign out</button>`:'';
+ $('nav').innerHTML=`<header class="hdr sticky top-0 z-[1000] shadow"><div class="max-w-[1920px] lg:px-6 mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
+ <div class="flex items-center gap-2"><span class="text-2xl">🍽️</span><div class="leading-tight"><b>H800 Food Premises Grading</b><div class="text-[11px] opacity-80">${esc(S.office||'Open Setup to set your area')}</div></div></div>
+ <nav class="dnav flex gap-1 text-sm items-center">${L.map(l=>`<a href="${l[0]}" class="px-3 py-1.5 rounded-lg ${a===l[3]?'bg-white/25 font-semibold':'hover:bg-white/10'}">${l[1]} ${l[2]}</a>`).join('')}${so}</nav>
+ <div class="md:hidden">${so}</div></div></header>
+ <div class="bnav">${L.map(l=>`<a href="${l[0]}" class="${a===l[3]?'on':''}"><span>${l[1]}</span>${l[2]}</a>`).join('')}</div>`;
+}

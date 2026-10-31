@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 – Setup</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css"></head>
+<body class="text-slate-800"><div id="nav"></div>
+<main class="max-w-5xl mx-auto p-3 grid lg:grid-cols-2 gap-4 items-start">
+ <section class="hero lg:col-span-2"><h1 class="text-2xl font-bold">⚙️ Set up your area</h1><p class="text-sm opacity-90">Each PHI enters their own details once. Nothing needs file editing.</p></section>
+
+ <div class="card p-4 space-y-3"><h3 class="font-semibold">1. PHI &amp; area</h3>
+  <label class="text-xs block">PHI name<input id="s_phi" class="w-full border rounded-lg p-2 text-sm"></label>
+  <label class="text-xs block">Area / office name (shown in the header)<input id="s_office" placeholder="e.g. Pottapitiya PHI area" class="w-full border rounded-lg p-2 text-sm"></label>
+  <label class="text-xs block">Web address of this app (used in QR codes)<input id="s_url" placeholder="https://yourproject.web.app/h800/" class="w-full border rounded-lg p-2 text-sm"></label>
+  <button type="button" onclick="$('s_url').value=location.href.replace(/[^\/]*([?#].*)?$/,'')" class="text-xs border rounded px-2 py-1">Use this page’s address</button></div>
+
+ <div class="card p-4 space-y-3"><h3 class="font-semibold">2. Firebase (your own project → your own private data)</h3>
+  <ol class="text-xs text-slate-600 list-decimal ml-5 space-y-0.5"><li>console.firebase.google.com → create project → Add app (Web) → copy the config.</li><li>Build → Authentication → enable E-mail/Password → add staff users.</li><li>Build → Firestore Database → create → Rules → paste the rules below.</li></ol>
+  <label class="text-xs block">Paste the Firebase config (the whole <code>firebaseConfig = {…}</code> block)<textarea id="s_fb" rows="6" class="w-full border rounded-lg p-2 text-xs font-mono"></textarea></label>
+  <p id="fbState" class="text-xs"></p>
+  <label class="text-xs block">Staff e-mails allowed (comma separated) → makes your Firestore rules<input id="s_em" placeholder="phi1@mail.com, phi2@mail.com" class="w-full border rounded-lg p-2 text-sm"></label>
+  <button type="button" onclick="mkRules()" class="text-xs border rounded px-2 py-1">Generate rules</button>
+  <textarea id="rules" rows="8" readonly class="hidden w-full border rounded-lg p-2 text-xs font-mono bg-slate-50"></textarea></div>
+
+ <button onclick="save()" class="lg:col-span-2 w-full bg-emerald-600 text-white rounded-xl py-3 font-semibold">💾 Save settings</button>
+
+ <div class="card p-4 space-y-2"><h3 class="font-semibold">3. Area boundary (GeoJSON)</h3>
+  <p class="text-xs text-slate-500">Add once – it is kept in this browser and shown on every map.</p>
+  <p id="geoState" class="text-sm"></p>
+  <label class="inline-block border rounded-lg px-3 py-2 text-sm cursor-pointer bg-emerald-50">Choose GeoJSON file<input type="file" id="gf" accept=".geojson,.json" class="hidden"></label>
+  <button onclick="rmGeo()" class="border rounded-lg px-3 py-2 text-sm text-rose-600">Remove</button></div>
+
+ <div class="card p-4 space-y-2"><h3 class="font-semibold">4. Copy settings to another phone / computer</h3>
+  <p class="text-xs text-slate-500">Export saves PHI details, Firebase config and area boundary in one file. Import it on the other device (or give it to a colleague to start with the same setup).</p>
+  <button onclick="exp()" class="border rounded-lg px-3 py-2 text-sm">⬇️ Export settings file</button>
+  <label class="inline-block border rounded-lg px-3 py-2 text-sm cursor-pointer">⬆️ Import settings file<input type="file" id="imp" accept=".json" class="hidden"></label></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+nav('s');
+const KEYS=['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId','measurementId'];
+const parseCfg=t=>{const o={};KEYS.forEach(k=>{const m=t.match(new RegExp('["\']?'+k+'["\']?\\s*:\\s*["\']([^"\']+)["\']'));if(m)o[k]=m[1]});return o};
+const getSet=()=>{try{return JSON.parse(localStorage.getItem('h800_settings'))||{}}catch(e){return {}}};
+function fill(){
+ const s=getSet();$('s_phi').value=s.phi||'';$('s_office').value=s.office||'';$('s_url').value=s.appUrl||'';
+ if(s.firebase&&s.firebase.apiKey)$('s_fb').value=JSON.stringify(s.firebase,null,2);
+ $('s_em').value=(s.emails||[]).join(', ');
+ $('fbState').innerHTML=s.firebase&&s.firebase.apiKey?'<span class="text-emerald-700">✔ Firebase connected – staff login is ON.</span>':'<span class="text-amber-600">Firebase not set – data stays only in this browser.</span>';
+ geoStat();
+}
+function save(){
+ const t=$('s_fb').value.trim(),fb=t?parseCfg(t):{};
+ if(t&&!(fb.apiKey&&fb.projectId)){alert('Could not read the Firebase config. Paste the full block that contains apiKey and projectId.');return}
+ const s={phi:$('s_phi').value.trim(),office:$('s_office').value.trim(),appUrl:$('s_url').value.trim(),firebase:fb,emails:$('s_em').value.split(',').map(x=>x.trim()).filter(Boolean)};
+ localStorage.setItem('h800_settings',JSON.stringify(s));alert('Saved. The page will reload.');location.reload();
+}
+function mkRules(){
+ const em=$('s_em').value.split(',').map(x=>x.trim()).filter(Boolean);if(!em.length){alert('Enter at least one staff e-mail.');return}
+ const r=$('rules');r.classList.remove('hidden');
+ r.value=`rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /h800_records/{id} {\n      allow read, write: if request.auth != null\n        && request.auth.token.email in [${em.map(e=>`'${e}'`).join(', ')}];\n    }\n  }\n}`;
+ r.select();
+}
+async function geoStat(){
+ const g=await getGeo();let n='';
+ if(g){const c=g.type==='FeatureCollection'?g.features.length:1;n=` (${c} feature${c>1?'s':''})`}
+ $('geoState').innerHTML=g?`<span class="text-emerald-700">✔ Area boundary saved${n}${window.AREA_GEOJSON?' – from geo-data.js':''}</span>`:'<span class="text-amber-600">No area boundary yet.</span>';
+}
+async function setGeo(g){if(!['FeatureCollection','Feature','Polygon','MultiPolygon'].includes(g.type))throw 0;await kvSet('area',g);geoStat()}
+$('gf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await setGeo(JSON.parse(await f.text()))}catch(x){alert('Not a valid GeoJSON file.')}e.target.value=''};
+async function rmGeo(){if(confirm('Remove the saved area boundary?')){await kvDel('area');geoStat()}}
+async function exp(){
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({h800:1,settings:getSet(),area:await kvGet('area')||null})],{type:'application/json'}));a.download='h800-settings.json';a.click();
+}
+$('imp').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{const d=JSON.parse(await f.text());if(!d.h800)throw 0;localStorage.setItem('h800_settings',JSON.stringify(d.settings||{}));if(d.area)await kvSet('area',d.area);alert('Imported. The page will reload.');location.reload()}
+ catch(x){alert('Not a valid H800 settings file.')}
+};
+fill();
+</script></body></html>

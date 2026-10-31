@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 – Map</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script></head>
+<body class="bg-slate-50 text-slate-800"><div id="nav"></div>
+<main class="max-w-[1920px] lg:px-6 mx-auto p-3 space-y-2">
+ <div class="bg-white p-3 rounded-xl border text-xs flex flex-wrap gap-3 items-center" id="legend"></div>
+ <div class="bg-white p-3 rounded-xl border text-xs flex flex-wrap gap-2 items-center">
+  <b>Area boundary:</b> <span id="areaState" class="text-slate-500"></span>
+  <label class="border rounded px-2 py-1 cursor-pointer bg-emerald-50">Add area GeoJSON<input type="file" id="gf" accept=".geojson,.json" class="hidden"></label>
+  <button id="dl" class="border rounded px-2 py-1 hidden">Download geo-data.js</button>
+  <button id="rm" class="border rounded px-2 py-1 text-rose-600 hidden">Remove saved area</button>
+ </div>
+ <div id="map" class="h-[68vh] rounded-xl border"></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script><script src="common.js"></script>
+<script>
+boot('m',()=>{
+const SHOW={A:1,B:1,C:1,D:1};window.SHOW=SHOW;
+function legend(){$('legend').innerHTML='<b>Show:</b> '+GRADES.map(x=>`<button onclick="SHOW['${x.g}']=!SHOW['${x.g}'];legend();markers()" class="px-3 py-1 rounded-full border text-xs font-semibold" style="${SHOW[x.g]?`background:${x.col};color:#fff;border-color:${x.col}`:'opacity:.45'}">${x.g} · ${rangeTxt(x.g)} · ${x.name}</button>`).join(' ')}
+window.legend=legend;legend();
+const map=L.map('map').setView([7.5,80.7],7);tile().addTo(map);
+let area=null;const mk=L.layerGroup().addTo(map);
+function pin(r){const c=G[r.grade].col;
+ return L.divIcon({className:'',iconSize:[34,44],iconAnchor:[17,44],popupAnchor:[0,-40],html:`<svg viewBox="0 0 34 44" width="34" height="44" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))"><path d="M17 1C8 1 1 8 1 17c0 12 16 26 16 26s16-14 16-26C33 8 26 1 17 1z" fill="${c}" stroke="#fff" stroke-width="2"/><text x="17" y="23" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="Arial">${r.grade}</text></svg>`})}
+function popup(r){const d=daysTo(r.next),g=G[r.grade];
+ const sec=SECS.map(s=>{const v=secPct(r,s);return `<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:8px;background:#f1f5f9;font-size:11px">${s.t.split('.')[0]}: ${v==null?'–':v.toFixed(0)+'%'}</span>`}).join('');
+ return `<div style="min-width:210px;font-size:12px;line-height:1.5"><b style="font-size:14px">${esc(r.name)}</b>
+ <span style="background:${g.col};color:#fff;border-radius:10px;padding:1px 8px;font-weight:700;margin-left:4px">${r.grade}</span>
+ <div style="color:#475569">${r.cat} · ${esc(r.addr)}</div><div>👤 ${esc(r.owner)}${r.tel?' · 📞 '+esc(r.tel):''}</div>
+ <div>Score: <b>${r.total}/${r.denom} = ${r.pct}%</b> (${g.name})</div><div>Last visit: ${r.date}</div>
+ <div>Next visit: <b style="color:${d<0?'#e11d48':'inherit'}">${r.next}</b> ${d<0?'('+(-d)+' days overdue)':'('+d+' days left)'}</div>
+ <div style="margin-top:3px">${sec}</div>${r.remark?`<div style="color:#475569">📝 ${esc(r.remark)}</div>`:''}
+ <div style="margin-top:6px;display:flex;gap:10px"><a href="shop.html?sid=${sidOf(r)}" style="color:#0f766e;font-weight:600">Progress</a><a href="report.html?id=${r.id}" style="color:#0369a1;font-weight:600">Report</a><a href="inspection.html?shop=${sidOf(r)}" style="color:#334155;font-weight:600">Inspect</a></div></div>`}
+function markers(){
+ mk.clearLayers();const pts=[];
+ latest().filter(r=>r.lat!=null).forEach(r=>{pts.push([r.lat,r.lng]);if(!SHOW[r.grade])return;
+  L.marker([r.lat,r.lng],{icon:pin(r),title:r.name}).addTo(mk).bindPopup(popup(r),{maxWidth:300})});
+ return pts;
+}
+window.markers=markers;
+async function loadArea(){
+ if(area){map.removeLayer(area);area=null}
+ area=await addArea(map);
+ const fromFile=!!window.AREA_GEOJSON,saved=!!(await kvGet('area'));
+ $('areaState').textContent=area?(fromFile?'loaded from geo-data.js (permanent)':'saved in this browser'):'none yet';
+ $('dl').classList.toggle('hidden',!area);$('rm').classList.toggle('hidden',!saved);
+ const pts=markers();
+ if(area)map.fitBounds(area.getBounds(),{padding:[20,20]});else if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:17});
+}
+$('gf').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{const g=JSON.parse(await f.text());
+  if(!['FeatureCollection','Feature','Polygon','MultiPolygon'].includes(g.type))throw 0;
+  await kvSet('area',g);await loadArea();
+ }catch(err){alert('Not a valid GeoJSON file.')}
+ e.target.value='';
+};
+$('dl').onclick=async()=>{const g=await getGeo();const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob(['window.AREA_GEOJSON = '+JSON.stringify(g)+';'],{type:'text/javascript'}));a.download='geo-data.js';a.click()};
+$('rm').onclick=async()=>{if(confirm('Remove the saved area boundary?')){await kvDel('area');loadArea()}};
+loadArea();
+});
+</script></body></html>

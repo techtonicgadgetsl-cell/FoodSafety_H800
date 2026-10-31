@@ -1,0 +1,113 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 – New Inspection</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>.pulse{width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;animation:p 1.4s infinite}
+@keyframes p{0%{box-shadow:0 0 0 0 rgba(37,99,235,.6)}70%{box-shadow:0 0 0 16px rgba(37,99,235,0)}100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}}
+.dim{opacity:.35;pointer-events:none}</style></head>
+<body class="bg-slate-50 text-slate-800"><div id="nav"></div>
+<main class="max-w-xl mx-auto p-6 text-center"><h2 class="text-lg font-bold mb-2">H 800 (revised 2022) – Inspection</h2>
+ <button onclick="openWiz(0)" class="bg-emerald-600 text-white rounded px-5 py-3 font-medium">Start / continue inspection</button></main>
+
+<div id="wiz" class="hidden fixed inset-0 bg-black/60 z-[2000] flex items-center justify-center sm:p-2">
+ <div class="bg-white sm:rounded-2xl w-full max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[94vh] flex flex-col">
+  <div class="p-3 border-b"><div class="flex justify-between items-center"><b id="stepT"></b><span id="stepN" class="text-xs text-slate-500"></span>
+   <button onclick="closeWiz()" class="text-slate-500 text-xl leading-none">×</button></div>
+   <div class="h-1.5 bg-slate-200 rounded mt-2"><div id="prog" class="h-1.5 bg-emerald-600 rounded"></div></div></div>
+  <div id="stepBody" class="overflow-y-auto p-3 flex-1"></div>
+  <div class="p-3 border-t flex flex-wrap items-center justify-between gap-2 text-sm">
+   <div id="live" class="font-semibold"></div>
+   <div class="flex gap-2"><button id="bk" onclick="go(step-1)" class="border rounded px-4 py-2">Back</button>
+    <button id="nx" onclick="next()" class="bg-emerald-600 text-white rounded px-4 py-2 font-medium">Next</button>
+    <button id="fin" onclick="finish()" class="hidden bg-blue-600 text-white rounded px-4 py-2 font-medium">Finish &amp; save</button></div></div>
+ </div></div>
+
+<div id="res" class="hidden fixed inset-0 bg-black/60 z-[3000] flex items-center justify-center p-3"><div class="bg-white rounded-xl max-w-sm w-full p-5 text-center space-y-2" id="resBody"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+const ON={};SECS.forEach(s=>ON[s.id]=true);
+const STEPS=['basic',...SECS.map(s=>s.id),'final'];let step=0,chosen=null,pm=null,me=null,areaL=null,pickMap=null,gpsTried=false;
+const inp=(id,l,t='text')=>`<label class="text-xs block">${l}<input id="${id}" type="${t}" class="w-full border rounded p-2 text-sm"></label>`;
+function build(){
+ $('stepBody').innerHTML=
+ `<div id="st_basic" class="grid md:grid-cols-2 gap-3">${inp('f_name','Name of the premise')}
+  <label class="text-xs block">Category<select id="f_cat" class="w-full border rounded p-2 text-sm"><option value="FF">Food Factory (FF)</option><option value="HT">Hotel (HT)</option><option value="BK">Bakery (BK)</option><option value="TS" selected>Tea kiosk / snack bar (TS)</option><option value="DS">Grocery (DS)</option><option value="SM">Supermarket (SM)</option><option value="OT">Others (OT)</option></select></label>
+  ${inp('f_addr','Address of the premise')}${inp('f_owner','Owner / manager')}${inp('f_nic','NIC number')}${inp('f_tel','Telephone')}${inp('f_date','Date','date')}</div>`+
+ SECS.map(s=>`<div id="st_${s.id}" class="hidden space-y-3"><div class="flex items-center justify-between bg-emerald-50 rounded p-2">
+   <span class="text-xs">Marks: <b id="sub_${s.id}"></b></span><button type="button" id="tg_${s.id}" onclick="ON['${s.id}']=!ON['${s.id}'];recalc()" class="px-3 py-1 rounded-full text-xs font-bold"></button></div>
+  <p id="off_${s.id}" class="hidden text-sm text-slate-500 p-3 text-center">Section switched OFF – not inspected, excluded from the score.</p>
+  <div id="body_${s.id}">${s.na?`<label class="block text-xs p-2 mb-2 rounded bg-amber-50"><input type="checkbox" id="na_${s.id}" onchange="recalc()"> Not applicable: ${s.na.l}</label>`:''}
+  <div class="grid md:grid-cols-2 gap-3">${s.items.map(i=>`<label class="text-xs" id="w_${i[0]}">${i[1]}<select id="m_${i[0]}" onchange="recalc()" class="w-full border rounded p-2 text-sm mt-1">${i[2].map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select></label>`).join('')}</div></div></div>`).join('')+
+ `<div id="st_final" class="hidden space-y-3"><label class="text-xs block">Remark / advice<textarea id="f_rem" rows="3" class="w-full border rounded p-2 text-sm"></textarea></label>
+  <p class="text-xs font-medium">Premise location – tap the map to set the exact spot <button type="button" onclick="gps()" class="ml-2 border rounded px-2 py-0.5">Use my location</button> <span id="coords" class="text-slate-500"></span></p>
+  <div id="pickMap" class="h-60 rounded-lg border"></div></div>`;
+ pickMap=L.map('pickMap').setView([7.5,80.7],7);tile().addTo(pickMap);
+ addArea(pickMap).then(a=>areaL=a);
+ pickMap.on('click',e=>setPick({lat:e.latlng.lat,lng:e.latlng.lng}));
+}
+function setPick(p){chosen=p;if(pm){pickMap.removeLayer(pm);pm=null}
+ if(p){pm=L.marker([p.lat,p.lng]).addTo(pickMap);$('coords').textContent=p.lat.toFixed(5)+', '+p.lng.toFixed(5)}else $('coords').textContent='(not set)'}
+function gps(){
+ if(!navigator.geolocation){alert('Location not available.');return}
+ navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];
+  if(me)pickMap.removeLayer(me);me=L.marker(ll,{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[16,16]})}).addTo(pickMap);pickMap.setView(ll,18)},
+  ()=>alert('Could not get location. Tap the map instead.'),{enableHighAccuracy:true,timeout:15000});
+}
+function recalc(){
+ const marks={},na={},subs={};let total=0,denom=0,n=0;
+ SECS.forEach(s=>{const on=ON[s.id];na[s.id]=!!(s.na&&$('na_'+s.id).checked);let t=0,m=0;if(on)n++;
+  s.items.forEach(i=>{const act=on&&!(na[s.id]&&s.na.keys.includes(i[0]));$('w_'+i[0]).classList.toggle('dim',!act);
+   if(act){const v=+$('m_'+i[0]).value;marks[i[0]]=v;t+=v;m+=maxOf(i)}else marks[i[0]]=null});
+  subs[s.id]={t,m,on};total+=t;denom+=m;$('sub_'+s.id).textContent=on?`${t}/${m}`:'off';
+  $('body_'+s.id).classList.toggle('hidden',!on);$('off_'+s.id).classList.toggle('hidden',on);
+  const b=$('tg_'+s.id);b.textContent=on?'Section ON':'Section OFF';b.className='px-3 py-1 rounded-full text-xs font-bold '+(on?'bg-emerald-600 text-white':'bg-slate-300 text-slate-700')});
+ const pct=denom>0?total/denom*100:0,grade=gradeOf(pct);
+ $('live').innerHTML=denom?`${total}/${denom} = ${pct.toFixed(1)}% <span class="ml-1 px-2 py-0.5 rounded-full ${G[grade].cls}">Grade ${grade}</span>`:'No section ON';
+ return {marks,na,subs,total,denom,pct,grade};
+}
+function go(i){
+ step=i;STEPS.forEach((k,j)=>$('st_'+k).classList.toggle('hidden',j!==i));
+ const k=STEPS[i],s=SECS.find(x=>x.id===k);
+ $('stepT').textContent=k==='basic'?'Basic details':k==='final'?'Location & remarks':s.t;
+ $('stepN').textContent=`Step ${i+1} of ${STEPS.length}`;$('prog').style.width=((i+1)/STEPS.length*100)+'%';
+ $('bk').classList.toggle('invisible',i===0);$('nx').classList.toggle('hidden',i===STEPS.length-1);$('fin').classList.toggle('hidden',i!==STEPS.length-1);
+ $('stepBody').scrollTop=0;
+ if(k==='final')setTimeout(()=>{pickMap.invalidateSize();if(!chosen){if(areaL)pickMap.fitBounds(areaL.getBounds());if(!gpsTried){gpsTried=true;gps()}}},150);
+}
+function next(){
+ if(step===0&&(!$('f_name').value.trim()||!$('f_owner').value.trim())){alert('Premise name and owner/manager are required.');return}
+ go(step+1);
+}
+function openWiz(i){$('wiz').classList.remove('hidden');go(i)}
+function closeWiz(){if(confirm('Close the inspection? Unsaved marks will be lost.'))$('wiz').classList.add('hidden')}
+function reset(){
+ ['f_name','f_addr','f_owner','f_nic','f_tel','f_rem'].forEach(i=>$(i).value='');$('f_date').value=today();
+ SECS.forEach(s=>{ON[s.id]=true;if(s.na)$('na_'+s.id).checked=false;s.items.forEach(i=>$('m_'+i[0]).selectedIndex=0)});setPick(null);recalc();
+}
+async function finish(){
+ const r=recalc();if(!r.denom){alert('Switch at least one section ON.');return}
+ const date=$('f_date').value||today(),rec={id:Date.now(),name:$('f_name').value.trim(),addr:$('f_addr').value.trim(),owner:$('f_owner').value.trim(),nic:$('f_nic').value.trim(),tel:$('f_tel').value.trim(),cat:$('f_cat').value,date,
+  marks:r.marks,na:r.na,on:{...ON},subs:r.subs,total:r.total,denom:r.denom,pct:+r.pct.toFixed(1),grade:r.grade,
+  next:addMonths(date,G[r.grade].months),remark:$('f_rem').value.trim(),lat:chosen?chosen.lat:null,lng:chosen?chosen.lng:null};
+ try{recs.unshift(rec);await saveRec(rec)}catch(e){alert('Could not save: '+e.message);return}
+ $('wiz').classList.add('hidden');const g=G[rec.grade];
+ $('resBody').innerHTML=`<p class="text-emerald-600 font-bold">✔ Inspection saved</p><h3 class="font-bold text-lg">${esc(rec.name)}</h3>
+  <p class="text-sm text-slate-500">${rec.date}</p><p class="text-3xl font-bold">${rec.total}/${rec.denom} = ${rec.pct}%</p>
+  <p><span class="px-4 py-1 rounded-full text-xl font-bold ${g.cls}">Grade ${rec.grade}</span></p><p class="text-sm">${g.name} (${rangeTxt(rec.grade)})</p>
+  <p class="text-sm">Next visit: <b>${rec.next}</b> (every ${g.months} month${g.months>1?'s':''})</p>
+  <div class="grid grid-cols-2 gap-2 pt-2 text-sm"><a class="border rounded p-2" href="report.html?id=${rec.id}">Print report</a><a class="border rounded p-2" href="shop.html?sid=${sidOf(rec)}">Shop progress / QR</a>
+  <a class="border rounded p-2" href="index.html">Dashboard</a><a class="bg-emerald-600 text-white rounded p-2" href="inspection.html">New inspection</a></div>`;
+ $('res').classList.remove('hidden');
+}
+boot('i',()=>{
+ build();reset();
+ const q=new URLSearchParams(location.search),sid=q.get('shop'),re=q.get('re');
+ const r=sid?shopRecs(sid).pop():re?recs.find(x=>x.id===+re):null;
+ if(r){$('f_name').value=r.name;$('f_addr').value=r.addr||'';$('f_owner').value=r.owner;$('f_nic').value=r.nic||'';$('f_tel').value=r.tel||'';$('f_cat').value=r.cat;
+  if(r.lat!=null){setPick({lat:r.lat,lng:r.lng});pickMap.setView([r.lat,r.lng],17)}}
+ else if(sid)alert('Shop not found in the records.');
+ openWiz(0);
+});
+</script></body></html>

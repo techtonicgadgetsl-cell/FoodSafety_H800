@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 Report</title>
+<style>
+@page{size:A4;margin:12mm}
+body{font-family:Arial,sans-serif;font-size:11px;color:#000;margin:0;background:#eee}
+.bar{background:#065f46;color:#fff;padding:8px;display:flex;gap:8px;align-items:center}.bar button,.bar a{background:#fff;color:#065f46;border:0;padding:6px 12px;border-radius:4px;cursor:pointer;text-decoration:none;font-size:13px}
+.page{background:#fff;width:186mm;margin:10px auto;padding:8mm;box-sizing:content-box}
+h1{font-size:15px;text-align:center;margin:0 0 6px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #000;padding:3px 5px;vertical-align:middle}
+.sec td{background:#e5e7eb;font-weight:bold}.c{text-align:center}.sel{display:inline-block;min-width:14px;border:1.5px solid #000;border-radius:50%;padding:0 3px;font-weight:bold}.na{color:#666;font-style:italic}
+.hd td{border:0;padding:2px 0}.sig{margin-top:22px;display:flex;justify-content:space-between}
+@media print{body{background:#fff}.bar{display:none}.page{margin:0;padding:0;width:auto;page-break-after:always}}
+</style></head><body>
+<div class="bar"><b>H800 report</b><button onclick="window.print()">Print / Save as PDF</button><button onclick="dl()">Download HTML</button><a id="back">Back</a></div>
+<div id="nav" style="display:none"></div><div id="rep"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+function dl(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['<!DOCTYPE html>'+document.documentElement.outerHTML.replace(/<script[\s\S]*?<\/script>/g,'')],{type:'text/html'}));a.download='H800-report.html';a.click()}
+boot('',()=>{
+ const r=recs.find(x=>x.id===+new URLSearchParams(location.search).get('id'));
+ if(!r){$('rep').innerHTML='<div class="page">Record not found.</div>';return}
+ $('back').href='shop.html?sid='+sidOf(r);
+ const g=G[r.grade];let body='';
+ SECS.forEach(s=>{
+  const off=(r.on&&r.on[s.id]===false)||s.items.every(i=>r.marks[i[0]]==null);let t=0;
+  body+=`<tr class="sec"><td colspan="3">${s.t}${off?' <span class="na">(not inspected)</span>':''}</td></tr>`;
+  s.items.forEach(i=>{const v=r.marks[i[0]];if(v!=null)t+=v;
+   const scale=i[2].map(o=>o[0]).sort((a,b)=>a-b).map(n=>n===v?`<span class="sel">${n}</span>`:n).join(' / ');
+   body+=`<tr><td>${i[1]}</td><td class="c">${v==null?'<span class="na">N/A</span>':scale}</td><td class="c"><b>${v==null?'–':v}</b></td></tr>`});
+  body+=`<tr><td colspan="2" style="text-align:right">Sub total</td><td class="c"><b>${off?'–':t}</b></td></tr>`;
+ });
+ $('rep').innerHTML=`<div class="page"><h1>Food Premises Grading Form H 800 (revised 2022)</h1>
+ <table class="hd"><tr><td>Category of the premise: <b>${r.cat}</b></td><td>Name of the premise: <b>${esc(r.name)}</b></td></tr>
+ <tr><td colspan="2">Address of the premise: ${esc(r.addr)}</td></tr><tr><td>Name of the owner/manager: ${esc(r.owner)}</td><td>NIC number: ${esc(r.nic)}</td></tr>
+ <tr><td colspan="2">Telephone: ${esc(r.tel)}</td></tr><tr><td colspan="2">Date: <b>${r.date}</b></td></tr></table>
+ <table style="margin-top:6px"><tr><th>Item</th><th style="width:30%">Marks</th><th style="width:60px">Awarded</th></tr>${body}
+ <tr class="sec"><td colspan="2" style="text-align:right">Grand total</td><td class="c">${r.total}/${r.denom}</td></tr>
+ <tr class="sec"><td colspan="2" style="text-align:right">Percentage / Grade</td><td class="c">${r.pct}% · ${r.grade}</td></tr></table>
+ <p><b>Grade ${r.grade} – ${g.name}.</b> Next inspection: <b>${r.next}</b> (once in ${g.months} month${g.months>1?'s':''}).</p>
+ <p><b>Remark / advice:</b> ${esc(r.remark)||'&nbsp;'}</p>
+ <div class="sig"><span>Signature of the PHI: ........................................ ${esc((window.H800_SET||{}).phi)}</span><span>Date: ${r.date}</span></div></div>
+ <div class="page"><h1>Instructions on grading food premises using H800 (revised 2022)</h1>
+ <table><tr><th>Grand total</th><th>Grade</th><th>Meaning</th><th>Inspection frequency</th></tr>${GRADES.map(x=>`<tr><td class="c">${rangeTxt(x.g)}</td><td class="c">${x.g}</td><td>${x.name}</td><td>Once in ${x.months} month${x.months>1?'s':''}</td></tr>`).join('')}</table>
+ <p>Circle the relevant mark. Marks of items that do not apply are not added to the total and are reduced from the 100 to calculate the denominator. Final mark is calculated as a percentage. Fill the format in duplicate: 1st copy to the premise, 2nd copy kept in the H800 file of the PHI office.</p>
+ <table><tr><th>Category</th><th>Code</th></tr><tr><td>Food Factory</td><td>FF</td></tr><tr><td>Hotel</td><td>HT</td></tr><tr><td>Bakery</td><td>BK</td></tr><tr><td>Tea kiosk / snack bar</td><td>TS</td></tr><tr><td>Grocery</td><td>DS</td></tr><tr><td>Supermarket</td><td>SM</td></tr><tr><td>Others</td><td>OT</td></tr></table></div>`;
+});
+</script></body></html>

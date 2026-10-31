@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 – Premise progress</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script></head>
+<body class="bg-slate-50 text-slate-800"><div id="nav"></div>
+<main class="max-w-[1920px] lg:px-6 mx-auto p-3 space-y-4">
+ <div class="card p-4 flex flex-wrap gap-4 justify-between">
+  <div><h2 id="sName" class="text-xl font-bold"></h2><p id="sInfo" class="text-sm text-slate-500"></p><p id="sNext" class="text-sm mt-1"></p>
+   <div class="flex flex-wrap gap-2 mt-3 text-sm"><a id="aIns" class="bg-emerald-600 text-white rounded px-3 py-1.5">New inspection</a><a id="aRep" class="border rounded px-3 py-1.5">Latest report</a>
+    <select id="yr" class="border rounded px-2 py-1.5"></select></div></div>
+  <div class="text-center"><div id="qr" class="inline-block p-2 bg-white border rounded"></div><p class="text-xs text-slate-500 mt-1">Scan → opens this shop’s inspection form (login required)</p>
+   <button onclick="printQR()" class="text-xs border rounded px-2 py-1 mt-1">Print QR label</button> <button onclick="saveQR()" class="text-xs border rounded px-2 py-1 mt-1">Save QR image</button></div>
+ </div>
+ <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="kp"></div>
+ <div class="grid lg:grid-cols-3 gap-4">
+  <div class="card p-3"><h3 class="font-semibold text-sm mb-1">Score % over visits</h3><div class="h-56"><canvas id="c1"></canvas></div></div>
+  <div class="card p-3"><h3 class="font-semibold text-sm mb-1">Visits per month</h3><div class="h-56"><canvas id="c2"></canvas></div></div>
+  <div class="card p-3"><h3 class="font-semibold text-sm mb-1">Section-wise progress (%)</h3><div class="h-64"><canvas id="c3"></canvas></div></div>
+ </div>
+ <div class="card overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Date</th><th class="p-2">Score</th><th class="p-2">Grade</th><th class="p-2">Change</th>
+  <th class="p-2 hs" colspan="5">Sections % (1–5)</th><th class="p-2">Next</th><th class="p-2"></th></tr></thead><tbody id="rows" class="divide-y"></tbody></table></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+let sid,c1,c2,c3;
+function qrImg(){const c=$('qr').querySelector('canvas');return c?c.toDataURL('image/png'):$('qr').querySelector('img').src}
+function printQR(){const r=shopRecs(sid).pop(),w=window.open('');w.document.write(`<body style="text-align:center;font-family:sans-serif"><h2>${esc(r.name)}</h2><img src="${qrImg()}" width="260"><p>Scan to open the H800 inspection form</p></body>`);w.document.close();setTimeout(()=>w.print(),300)}
+function saveQR(){const a=document.createElement('a');a.href=qrImg();a.download='qr-'+sid+'.png';a.click()}
+async function delOne(id){if(confirm('Delete this inspection record?')){await delRec(id);draw()}}
+function draw(){
+ const all=shopRecs(sid);if(!all.length){location.href='index.html';return}
+ const y=$('yr').value,R=y==='all'?all:all.filter(r=>r.date.startsWith(y)),last=all[all.length-1];
+ const pr=i=>i>0?R[i].pct-R[i-1].pct:null;
+ $('kp').innerHTML=[['Visits',R.length],['Latest',`${last.pct}% · ${last.grade}`],['Average %',R.length?(R.reduce((s,r)=>s+r.pct,0)/R.length).toFixed(1):'–'],
+  ['Change (first→last)',R.length>1?((R[R.length-1].pct-R[0].pct>0?'+':'')+(R[R.length-1].pct-R[0].pct).toFixed(1)):'–']].map(k=>`<div class="card p-3"><p class="text-xs text-slate-500">${k[0]}</p><p class="text-xl font-bold">${k[1]}</p></div>`).join('');
+ c1&&c1.destroy();c2&&c2.destroy();c3&&c3.destroy();
+ c1=new Chart($('c1'),{type:'line',data:{labels:R.map(r=>r.date),datasets:[{label:'Score %',data:R.map(r=>r.pct),borderColor:'#059669',backgroundColor:R.map(r=>G[r.grade].col),pointRadius:6,tension:.2}]},options:{maintainAspectRatio:false,scales:{y:{min:0,max:100}}}});
+ const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],mc=Array(12).fill(0);R.forEach(r=>mc[+r.date.slice(5,7)-1]++);
+ c2=new Chart($('c2'),{type:'bar',data:{labels:mn,datasets:[{label:'Visits',data:mc,backgroundColor:'#059669'}]},options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+ const col=['#2563eb','#059669','#f59e0b','#e11d48','#7c3aed'];
+ c3=new Chart($('c3'),{type:'line',data:{labels:R.map(r=>r.date),datasets:SECS.map((s,i)=>({label:s.t,data:R.map(r=>{const v=secPct(r,s);return v==null?null:+v.toFixed(1)}),borderColor:col[i],spanGaps:true,tension:.2}))},options:{maintainAspectRatio:false,scales:{y:{min:0,max:100}}}});
+ $('rows').innerHTML=R.map((r,i)=>{const d=pr(i);return `<tr><td class="p-2">${r.date}</td><td class="p-2">${r.total}/${r.denom} (${r.pct}%)</td><td class="p-2"><span class="px-2 py-0.5 rounded-full text-xs font-bold ${G[r.grade].cls}">${r.grade}</span></td>
+  <td class="p-2 ${d>0?'text-emerald-600':d<0?'text-rose-600':''}">${d==null?'first':(d>0?'+':'')+d.toFixed(1)}</td>${SECS.map(s=>{const v=secPct(r,s);return `<td class="p-1 text-xs hs">${v==null?'–':v.toFixed(0)}</td>`}).join('')}
+  <td class="p-2">${r.next}</td><td class="p-2 whitespace-nowrap"><a class="text-blue-700 mr-2" href="report.html?id=${r.id}">Report</a><button class="text-rose-600" onclick="delOne(${r.id})">Del</button></td></tr>`}).reverse().join('');
+}
+boot('d',()=>{
+ sid=new URLSearchParams(location.search).get('sid');const all=shopRecs(sid);
+ if(!all.length){$('sName').textContent='Premise not found';return}
+ const l=all[all.length-1];
+ $('sName').innerHTML=`${esc(l.name)} <span class="text-sm px-2 py-0.5 rounded-full ${G[l.grade].cls}">Grade ${l.grade}</span>`;
+ $('sInfo').textContent=`${l.cat} · ${l.addr||''} · ${l.owner} · ${l.tel||''}`;
+ $('sNext').innerHTML=`Next visit due: <b class="${daysTo(l.next)<0?'text-rose-600':''}">${l.next}</b> (${daysTo(l.next)<0?-daysTo(l.next)+' days overdue':daysTo(l.next)+' days left'})`;
+ $('aIns').href='inspection.html?shop='+sid;$('aRep').href='report.html?id='+l.id;
+ const ys=[...new Set(all.map(r=>r.date.slice(0,4)))].sort().reverse();
+ $('yr').innerHTML=`<option value="all">All years</option>`+ys.map(y=>`<option>${y}</option>`).join('');$('yr').value=ys[0];$('yr').onchange=draw;
+ new QRCode($('qr'),{text:shopUrl(sid),width:140,height:140});
+ if(location.protocol==='file:')$('sInfo').insertAdjacentHTML('afterend','<p class="text-xs text-amber-600">QR needs a web address: host the folder (Firebase Hosting) and set APP_URL in firebase-config.js.</p>');
+ draw();
+});
+</script></body></html>
