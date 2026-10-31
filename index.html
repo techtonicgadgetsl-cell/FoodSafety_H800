@@ -18,7 +18,7 @@
 
  </div>
  <div class="card"><div class="p-3 flex flex-wrap gap-2 justify-between items-center border-b"><h3 class="font-semibold">🏪 All premises</h3>
-  <div class="flex gap-2"><input id="q" placeholder="Search..." class="border rounded px-2 py-1 text-sm"><button onclick="exportCSV()" class="text-sm border rounded px-2 py-1">Export CSV</button></div></div>
+  <div class="flex gap-2"><input id="q" placeholder="Search..." class="border rounded px-2 py-1 text-sm"><button onclick="exportCSV()" class="text-sm border rounded px-2 py-1">Export CSV</button><button id="pubAll" onclick="pubAll()" class="hidden text-sm border rounded px-2 py-1">🌐 Publish all</button></div></div>
   <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Premise</th><th class="p-2 hs">Cat.</th><th class="p-2 hs">Date</th><th class="p-2">Score</th><th class="p-2">Grade</th><th class="p-2">Next due</th><th class="p-2"></th></tr></thead><tbody id="rows" class="divide-y"></tbody></table></div></div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
@@ -57,6 +57,7 @@ function render(){
   <td class="p-2 ${r.next<today()?'text-rose-600 font-semibold':''}">${r.next}</td><td class="p-2 whitespace-nowrap"><a class="text-emerald-700 mr-2" href="shop.html?sid=${sidOf(r)}">Progress / QR</a><a class="text-blue-700 mr-2" href="report.html?id=${r.id}">Report</a><a class="text-slate-700" href="inspection.html?shop=${sidOf(r)}">Inspect</a></td></tr>`).join('')
   ||'<tr><td colspan="7" class="p-6 text-center text-slate-400">No inspections yet – use “New Inspection”.</td></tr>';
 }
+async function pubAll(){let n=0;try{for(const r of latest()){await publishShop(sidOf(r));n++}alert(n+' shop(s) published to the public / owner views.')}catch(e){alert('Failed: '+e.message)}}
 function exportCSV(){
  const h=['Date','Premise','Category','Address','Owner','NIC','Tel','Total','Denominator','Percent','Grade','NextDue','Remark'],q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
  const csv=[h.join(',')].concat(recs.map(r=>[r.date,r.name,r.cat,r.addr,r.owner,r.nic,r.tel,r.total,r.denom,r.pct,r.grade,r.next,r.remark].map(q).join(','))).join('\n');
@@ -65,7 +66,7 @@ function exportCSV(){
 boot('d',()=>{
  const ys=[...new Set(recs.map(r=>r.date.slice(0,4)).concat(today().slice(0,4)))].sort().reverse();
  $('yr').innerHTML=ys.map(y=>`<option>${y}</option>`).join('');$('yr').onchange=year;$('q').oninput=render;
- render();due();year();
+ render();due();year();if(FB_ON)$('pubAll').classList.remove('hidden');
  const S=window.H800_SET||{},L=latest(),ov=L.filter(r=>daysTo(r.next)<0).length,wk=L.filter(r=>{const d=daysTo(r.next);return d>=0&&d<=7}).length;
  $('hName').textContent=S.phi||'Welcome';$('hSub').textContent=(S.office?S.office+' · ':'')+`${L.length} premises · ${wk} due this week · ${ov} overdue`;
  if(!S.office&&!FB_ON)$('welcome').innerHTML='<div class="card p-4 border-amber-300"><b>👋 First time here?</b> Open <a class="text-emerald-700 underline" href="setup.html">Setup</a> to add your area name, Firebase and area GeoJSON – takes 2 minutes.</div>';

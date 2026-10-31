@@ -25,6 +25,7 @@
 <div id="res" class="hidden fixed inset-0 bg-black/60 z-[3000] flex items-center justify-center p-3"><div class="bg-white rounded-xl max-w-sm w-full p-5 text-center space-y-2" id="resBody"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="geo-data.js"></script>
 <script src="common.js"></script>
 <script>
 const ON={};SECS.forEach(s=>ON[s.id]=true);
@@ -92,6 +93,7 @@ async function finish(){
   marks:r.marks,na:r.na,on:{...ON},subs:r.subs,total:r.total,denom:r.denom,pct:+r.pct.toFixed(1),grade:r.grade,
   next:addMonths(date,G[r.grade].months),remark:$('f_rem').value.trim(),lat:chosen?chosen.lat:null,lng:chosen?chosen.lng:null};
  try{recs.unshift(rec);await saveRec(rec)}catch(e){alert('Could not save: '+e.message);return}
+ try{await publishShop(sidOf(rec))}catch(e){console.warn('publish failed',e)}
  $('wiz').classList.add('hidden');const g=G[rec.grade];
  $('resBody').innerHTML=`<p class="text-emerald-600 font-bold">✔ Inspection saved</p><h3 class="font-bold text-lg">${esc(rec.name)}</h3>
   <p class="text-sm text-slate-500">${rec.date}</p><p class="text-3xl font-bold">${rec.total}/${rec.denom} = ${rec.pct}%</p>

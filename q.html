@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Food premises grade</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head>
+<body class="text-slate-800">
+<header class="hdr shadow"><div class="max-w-3xl mx-auto px-3 py-3 flex items-center gap-2"><span class="text-2xl">🍽️</span><div class="leading-tight"><b>Food Premises Grading (H 800)</b><div id="off" class="text-[11px] opacity-80"></div></div></div></header>
+<main class="max-w-3xl mx-auto p-3 space-y-3" id="m"><div class="card p-6 text-center text-slate-500">Loading…</div></main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+const Q=new URLSearchParams(location.search),sid=Q.get('s'),kk=Q.get('k');
+$('off').textContent=(window.H800_SET||{}).office||'';
+const msg=t=>$('m').innerHTML='<div class="card p-6 text-center">'+t+'</div>';
+async function init(){
+ if(!FB_ON)return msg('This page is not set up yet. Ask the PHI office.');
+ if(!sid)return msg('Invalid QR code.');
+ let d;try{d=await db.collection('h800_public').doc(sid).get()}catch(e){return msg('Could not load: '+esc(e.message))}
+ if(!d.exists)return msg('No grading information published for this premise yet.');
+ const r=d.data(),g=G[r.grade],dl=daysTo(r.next);
+ $('m').innerHTML=`<div class="card p-5 text-center"><p class="text-xs text-slate-500">${esc(r.cat)} · ${esc(r.addr)}</p><h1 class="text-xl font-bold mt-1">${esc(r.name)}</h1>
+  <div class="mx-auto my-4 w-28 h-28 rounded-full flex items-center justify-center text-6xl font-extrabold text-white shadow-lg" style="background:${g.col}">${r.grade}</div>
+  <p class="text-lg font-semibold">${g.name}</p><p class="text-sm text-slate-500">Score ${r.pct}% (grade range ${rangeTxt(r.grade)})</p>
+  <div class="h-2 bg-slate-200 rounded mt-3"><div class="h-2 rounded" style="width:${r.pct}%;background:${g.col}"></div></div>
+  <div class="grid grid-cols-2 gap-2 mt-4 text-sm"><div class="bg-slate-50 rounded-xl p-2"><p class="text-xs text-slate-500">Last inspection</p><b>${r.date}</b></div>
+  <div class="bg-slate-50 rounded-xl p-2"><p class="text-xs text-slate-500">Next inspection</p><b>${r.next}</b></div></div></div>
+  <div class="card p-3 text-xs text-slate-600"><b>Grades:</b> ${GRADES.map(x=>`<span class="inline-block mr-2"><b style="color:${x.col}">${x.g}</b> ${rangeTxt(x.g)} ${x.name}`+'</span>').join('')}</div>
+  <a href="pmap.html?s=${sid}" class="block card p-4 font-semibold text-emerald-700">🗺️ See other graded shops in the area (A B C D map)</a>
+  <div class="card p-4"><b>🏪 Shop owner – see your progress</b>
+   <div class="flex gap-2 mt-2"><input id="ok" value="${esc(kk||'')}" placeholder="Access code" class="flex-1 border rounded-lg p-2 uppercase tracking-widest"><button onclick="owner()" class="bg-emerald-600 text-white rounded-lg px-4">Open</button></div><p id="oerr" class="text-xs text-rose-600 mt-1"></p></div>
+  <div id="own"></div>
+  <a href="inspection.html?shop=${sid}" class="block card p-4 font-semibold text-slate-700">🧑‍⚕️ PHI staff – new inspection (login required)</a>`;
+ if(kk)owner();
+}
+async function owner(){
+ const c=$('ok').value.trim().toUpperCase();if(!c)return;$('oerr').textContent='';
+ let d;try{d=await db.collection('h800_owner').doc(sid+'_'+c).get()}catch(e){$('oerr').textContent='Access denied.';return}
+ if(!d.exists){$('oerr').textContent='Wrong access code.';$('own').innerHTML='';return}
+ const H=d.data().history.sort((a,b)=>a.date.localeCompare(b.date));
+ $('own').innerHTML=`<div class="card p-3"><b>📈 Your progress</b><div class="h-52 mt-2"><canvas id="o1"></canvas></div></div>
+  <div class="card p-3"><b>Section-wise (%)</b><div class="h-56 mt-2"><canvas id="o2"></canvas></div></div>
+  <div class="card overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Date</th><th class="p-2">Score</th><th class="p-2">Grade</th><th class="p-2">Next</th></tr></thead><tbody class="divide-y">
+  ${H.slice().reverse().map(h=>`<tr><td class="p-2">${h.date}</td><td class="p-2">${h.pct}%</td><td class="p-2"><b style="color:${G[h.grade].col}">${h.grade}</b></td><td class="p-2">${h.next}</td></tr>${h.remark?`<tr><td colspan="4" class="px-2 pb-2 text-xs text-slate-500">📝 ${esc(h.remark)}</td></tr>`:''}`).join('')}</tbody></table></div>`;
+ new Chart($('o1'),{type:'line',data:{labels:H.map(h=>h.date),datasets:[{label:'Score %',data:H.map(h=>h.pct),borderColor:'#0f766e',backgroundColor:H.map(h=>G[h.grade].col),pointRadius:6,tension:.2}]},options:{maintainAspectRatio:false,scales:{y:{min:0,max:100}}}});
+ const col=['#2563eb','#059669','#f59e0b','#e11d48','#7c3aed'];
+ new Chart($('o2'),{type:'line',data:{labels:H.map(h=>h.date),datasets:SECS.map((s,i)=>({label:s.t,data:H.map(h=>h.secs&&h.secs[s.id]),borderColor:col[i],spanGaps:true,tension:.2}))},options:{maintainAspectRatio:false,scales:{y:{min:0,max:100}}}});
+ $('own').scrollIntoView({behavior:'smooth'});
+}
+init();
+</script></body></html>

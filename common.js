@@ -64,7 +64,9 @@ const tile=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services
 
 /* ---- Helpers ---- */
 const sidOf=r=>{let h=5381;const s=pk(r);for(let i=0;i<s.length;i++)h=(h*33^s.charCodeAt(i))>>>0;return h.toString(36)};
-const shopUrl=sid=>(window.APP_URL||location.href.replace(/[^\/]*([?#].*)?$/,'')).replace(/\/?$/,'/')+'inspection.html?shop='+sid;
+const baseUrl=()=>(window.APP_URL||location.href.replace(/[^\/]*([?#].*)?$/,'')).replace(/\/?$/,'/');
+const shopUrl=sid=>baseUrl()+'q.html?s='+sid;
+const ownerUrl=(sid,code)=>baseUrl()+'q.html?s='+sid+'&k='+code;
 const daysTo=d=>Math.round((new Date(d)-new Date(today()))/864e5);
 const secPct=(r,s)=>{const v=r.subs&&r.subs[s.id];return v&&typeof v==='object'&&v.on!==false&&v.m?v.t/v.m*100:null};
 const shopRecs=sid=>recs.filter(r=>sidOf(r)===sid).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
@@ -79,10 +81,10 @@ const delRec=async id=>{recs=recs.filter(x=>x.id!==id);persist();if(FB_ON)await 
 function loginUI(){return new Promise(res=>{
  const d=document.createElement('div');d.className='fixed inset-0 bg-slate-900/80 z-[5000] flex items-center justify-center p-3';
  d.innerHTML=`<div class="bg-white rounded-xl p-5 w-full max-w-sm space-y-3"><h2 class="font-bold text-lg">H800 – Staff login</h2>
- <input id="lg_e" type="email" placeholder="E-mail" class="w-full border rounded p-2"><input id="lg_p" type="password" placeholder="Password" class="w-full border rounded p-2">
+ <input id="lg_e" type="email" placeholder="E-mail" class="w-full border rounded p-2"><input id="lg_p" type="password" placeholder="Password / PIN" class="w-full border rounded p-2">
  <p id="lg_m" class="text-xs text-rose-600"></p><button id="lg_b" class="w-full bg-emerald-600 text-white rounded p-2 font-medium">Sign in</button></div>`;
- document.body.appendChild(d);
- const go=async()=>{try{await auth.signInWithEmailAndPassword($('lg_e').value.trim(),$('lg_p').value);d.remove();res()}catch(e){$('lg_m').textContent='Login failed: '+e.message}};
+ document.body.appendChild(d);$('lg_e').value=localStorage.getItem('h800_email')||'';if($('lg_e').value)$('lg_p').focus();
+ const go=async()=>{try{await auth.signInWithEmailAndPassword($('lg_e').value.trim(),$('lg_p').value);localStorage.setItem('h800_email',$('lg_e').value.trim());d.remove();res()}catch(e){$('lg_m').textContent='Login failed: '+e.message}};
  $('lg_b').onclick=go;$('lg_p').onkeydown=e=>{if(e.key==='Enter')go()};
 })}
 async function boot(active,fn){
@@ -99,6 +101,18 @@ async function boot(active,fn){
  }
  fn();
 }
+
+/* ---- Public / owner publishing ---- */
+const ALPHA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode=()=>[...crypto.getRandomValues(new Uint8Array(8))].map(b=>ALPHA[b%32]).join('');
+async function ownerCode(sid){const ref=db.collection('h800_shops').doc(sid),d=await ref.get();if(d.exists)return d.data().code;const code=newCode();await ref.set({sid,code});return code}
+async function publishShop(sid){
+ if(!FB_ON)return;const R=shopRecs(sid);if(!R.length)return;const l=R[R.length-1],S=window.H800_SET||{},loc=R.slice().reverse().find(r=>r.lat!=null)||l;
+ const code=await ownerCode(sid);
+ await db.collection('h800_public').doc(sid).set({sid,name:l.name,cat:l.cat,addr:l.addr||'',grade:l.grade,pct:l.pct,total:l.total,denom:l.denom,date:l.date,next:l.next,lat:loc.lat??null,lng:loc.lng??null,office:S.office||''});
+ await db.collection('h800_owner').doc(sid+'_'+code).set({sid,name:l.name,history:R.map(r=>({date:r.date,pct:r.pct,grade:r.grade,total:r.total,denom:r.denom,next:r.next,remark:r.remark||'',secs:Object.fromEntries(SECS.map(x=>{const v=secPct(r,x);return [x.id,v==null?null:+v.toFixed(1)]}))}))});
+}
+const pinIcon=g=>L.divIcon({className:'',iconSize:[34,44],iconAnchor:[17,44],popupAnchor:[0,-40],html:`<svg viewBox="0 0 34 44" width="34" height="44" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))"><path d="M17 1C8 1 1 8 1 17c0 12 16 26 16 26s16-14 16-26C33 8 26 1 17 1z" fill="${G[g].col}" stroke="#fff" stroke-width="2"/><text x="17" y="23" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="Arial">${g}</text></svg>`});
 
 /* ---- Nav ---- */
 function nav(a){

@@ -8,9 +8,10 @@
   <div><h2 id="sName" class="text-xl font-bold"></h2><p id="sInfo" class="text-sm text-slate-500"></p><p id="sNext" class="text-sm mt-1"></p>
    <div class="flex flex-wrap gap-2 mt-3 text-sm"><a id="aIns" class="bg-emerald-600 text-white rounded px-3 py-1.5">New inspection</a><a id="aRep" class="border rounded px-3 py-1.5">Latest report</a>
     <select id="yr" class="border rounded px-2 py-1.5"></select></div></div>
-  <div class="text-center"><div id="qr" class="inline-block p-2 bg-white border rounded"></div><p class="text-xs text-slate-500 mt-1">Scan → opens this shop’s inspection form (login required)</p>
+  <div class="text-center"><div id="qr" class="inline-block p-2 bg-white border rounded"></div><p class="text-xs text-slate-500 mt-1">Scan → public summary · owner &amp; PHI options inside</p>
    <button onclick="printQR()" class="text-xs border rounded px-2 py-1 mt-1">Print QR label</button> <button onclick="saveQR()" class="text-xs border rounded px-2 py-1 mt-1">Save QR image</button></div>
  </div>
+ <div id="own" class="card p-4 text-sm hidden"></div>
  <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="kp"></div>
  <div class="grid lg:grid-cols-3 gap-4">
   <div class="card p-3"><h3 class="font-semibold text-sm mb-1">Score % over visits</h3><div class="h-56"><canvas id="c1"></canvas></div></div>
@@ -57,5 +58,17 @@ boot('d',()=>{
  new QRCode($('qr'),{text:shopUrl(sid),width:140,height:140});
  if(location.protocol==='file:')$('sInfo').insertAdjacentHTML('afterend','<p class="text-xs text-amber-600">QR needs a web address: host the folder (Firebase Hosting) and set APP_URL in firebase-config.js.</p>');
  draw();
+ if(FB_ON)showOwner();
 });
+async function showOwner(){
+ try{const code=await ownerCode(sid),u=ownerUrl(sid,code);
+  $('own').classList.remove('hidden');
+  $('own').innerHTML=`<b>🔑 Shop owner access (progress only, cannot add reports)</b><p class="mt-1">Access code: <b class="text-lg tracking-widest">${code}</b></p>
+  <p class="text-xs text-slate-500 break-all">Owner link: ${esc(u)}</p>
+  <div class="flex flex-wrap gap-2 mt-2"><button class="border rounded px-3 py-1" onclick="navigator.clipboard.writeText('${u}')">Copy owner link</button>
+  <button class="border rounded px-3 py-1" onclick="navigator.clipboard.writeText('${code}')">Copy code</button>
+  <button class="border rounded px-3 py-1" onclick="pubNow()">🌐 Publish / refresh public data</button></div>`;
+ }catch(e){$('own').classList.remove('hidden');$('own').textContent='Owner access unavailable: '+e.message}
+}
+async function pubNow(){try{await publishShop(sid);alert('Public summary and owner data updated.')}catch(e){alert('Failed: '+e.message)}}
 </script></body></html>

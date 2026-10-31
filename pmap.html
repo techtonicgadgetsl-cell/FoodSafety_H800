@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graded shops map</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script></head>
+<body class="text-slate-800">
+<header class="hdr shadow"><div class="max-w-[1920px] mx-auto px-3 py-3 flex items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-2xl">🗺️</span><div class="leading-tight"><b>Graded food premises</b><div id="off" class="text-[11px] opacity-80"></div></div></div><a id="back" class="text-sm bg-white/20 rounded-lg px-3 py-1.5 hidden">← Back</a></div></header>
+<main class="max-w-[1920px] mx-auto p-3 space-y-2"><div id="legend" class="card p-3 text-xs flex flex-wrap gap-2 items-center"></div><div id="map" class="h-[72vh] rounded-2xl border"></div></main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="geo-data.js"></script><script src="common.js"></script>
+<script>
+const sid=new URLSearchParams(location.search).get('s');$('off').textContent=(window.H800_SET||{}).office||'';
+if(sid){$('back').href='q.html?s='+sid;$('back').classList.remove('hidden')}
+const SHOW={A:1,B:1,C:1,D:1};let P=[],mk,map,open=null;
+function legend(){$('legend').innerHTML='<b>Show:</b> '+GRADES.map(x=>`<button onclick="SHOW['${x.g}']=!SHOW['${x.g}'];legend();draw()" class="px-3 py-1 rounded-full border font-semibold" style="${SHOW[x.g]?`background:${x.col};color:#fff;border-color:${x.col}`:'opacity:.45'}">${x.g} · ${rangeTxt(x.g)} · ${x.name}</button>`).join(' ')}
+function draw(){
+ mk.clearLayers();
+ P.filter(r=>r.lat!=null&&SHOW[r.grade]).forEach(r=>{const g=G[r.grade];
+  const m=L.marker([r.lat,r.lng],{icon:pinIcon(r.grade),title:r.name}).addTo(mk).bindPopup(`<div style="min-width:190px;font-size:12px;line-height:1.5"><b style="font-size:14px">${esc(r.name)}</b>
+  <span style="background:${g.col};color:#fff;border-radius:10px;padding:1px 8px;font-weight:700;margin-left:4px">${r.grade}</span><div style="color:#475569">${r.cat} · ${esc(r.addr)}</div>
+  <div>Score: <b>${r.pct}%</b> (${g.name})</div><div>Last inspection: ${r.date}</div><div>Next: ${r.next}</div><a href="q.html?s=${r.sid}" style="color:#0f766e;font-weight:600">Open shop page</a></div>`,{maxWidth:280});
+  if(r.sid===sid)open=m});
+}
+(async()=>{
+ map=L.map('map').setView([7.5,80.7],7);tile().addTo(map);mk=L.layerGroup().addTo(map);legend();
+ const a=await addArea(map);
+ if(!FB_ON){alert('Not set up yet.');return}
+ try{P=(await db.collection('h800_public').get()).docs.map(d=>d.data())}catch(e){alert('Could not load: '+e.message);return}
+ draw();const pts=P.filter(r=>r.lat!=null).map(r=>[r.lat,r.lng]);
+ if(a)map.fitBounds(a.getBounds(),{padding:[20,20]});else if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:17});
+ if(open){map.setView(open.getLatLng(),17);open.openPopup()}
+})();
+</script></body></html>
