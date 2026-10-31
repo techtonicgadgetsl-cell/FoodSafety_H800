@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H800 – QR stickers</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+@page{size:A4;margin:8mm}
+#sheet{display:grid;gap:4mm;grid-template-columns:repeat(var(--cols,2),1fr)}
+#sheet .stk{break-inside:avoid;text-align:center}
+#sheet img{width:100%;display:block}
+@media print{#nav,.bnav,.noprint{display:none!important}body{background:#fff!important;padding:0!important}main{padding:0!important;max-width:none!important}}
+</style></head>
+<body class="text-slate-800"><div id="nav"></div>
+<main class="max-w-[1100px] mx-auto p-3 space-y-3">
+ <section class="hero noprint"><h1 class="text-2xl font-bold">🔲 QR stickers – all shops</h1><p class="text-sm opacity-90">Select the shops, then print one A4 sheet (cut &amp; stick) or download every sticker as a PNG.</p></section>
+ <div class="card p-3 noprint space-y-2">
+  <div class="flex flex-wrap gap-2 items-center text-sm">
+   <label class="flex items-center gap-1"><input type="checkbox" id="all" checked> Select all</label>
+   <label class="ml-3">Per row <select id="cols" class="border rounded px-2 py-1"><option>2</option><option>3</option><option>4</option></select></label>
+   <button onclick="window.print()" class="bg-emerald-600 text-white rounded-lg px-4 py-2 font-medium">🖨️ Print / Save as PDF</button>
+   <button onclick="dlAll()" class="border rounded-lg px-4 py-2">⬇️ Download PNGs</button>
+   <span id="cnt" class="text-xs text-slate-500"></span></div>
+  <div id="list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-1 text-sm max-h-60 overflow-y-auto"></div></div>
+ <div id="sheet"></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+let SH=[];const sel=new Set();
+function draw(){
+ const chosen=SH.filter(r=>sel.has(sidOf(r)));
+ $('cnt').textContent=chosen.length+' of '+SH.length+' selected';
+ document.documentElement.style.setProperty('--cols',$('cols').value);
+ $('sheet').innerHTML=chosen.map(r=>`<div class="stk"><img src="${stickerCanvas(r.name,shopUrl(sidOf(r))).toDataURL('image/png')}"></div>`).join('')||'<p class="text-slate-400 text-center p-6 noprint">No shops selected.</p>';
+}
+function dlAll(){
+ SH.filter(r=>sel.has(sidOf(r))).forEach((r,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=stickerCanvas(r.name,shopUrl(sidOf(r))).toDataURL('image/png');a.download='QR-'+fileSafe(r.name)+'.png';a.click()},i*400));
+}
+boot('q',()=>{
+ SH=latest().sort((a,b)=>a.name.localeCompare(b.name));SH.forEach(r=>sel.add(sidOf(r)));
+ $('list').innerHTML=SH.map(r=>`<label class="flex items-center gap-1"><input type="checkbox" class="ck" value="${sidOf(r)}" checked> ${esc(r.name)}</label>`).join('')||'<p class="text-slate-400">No shops yet.</p>';
+ document.querySelectorAll('.ck').forEach(c=>c.onchange=()=>{c.checked?sel.add(c.value):sel.delete(c.value);$('all').checked=sel.size===SH.length;draw()});
+ $('all').onchange=e=>{document.querySelectorAll('.ck').forEach(c=>{c.checked=e.target.checked;e.target.checked?sel.add(c.value):sel.delete(c.value)});draw()};
+ $('cols').onchange=draw;draw();
+});
+</script></body></html>

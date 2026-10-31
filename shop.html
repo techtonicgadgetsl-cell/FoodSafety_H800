@@ -9,7 +9,7 @@
    <div class="flex flex-wrap gap-2 mt-3 text-sm"><a id="aIns" class="bg-emerald-600 text-white rounded px-3 py-1.5">New inspection</a><a id="aRep" class="border rounded px-3 py-1.5">Latest report</a>
     <select id="yr" class="border rounded px-2 py-1.5"></select></div></div>
   <div class="text-center"><div id="qr" class="inline-block p-2 bg-white border rounded"></div><p class="text-xs text-slate-500 mt-1">Scan → public summary · owner &amp; PHI options inside</p>
-   <button onclick="printQR()" class="text-xs border rounded px-2 py-1 mt-1">Print QR label</button> <button onclick="saveQR()" class="text-xs border rounded px-2 py-1 mt-1">Save QR image</button></div>
+   <button onclick="printQR()" class="text-xs border rounded px-2 py-1 mt-1">Print QR sticker</button> <button onclick="saveQR()" class="text-xs border rounded px-2 py-1 mt-1">Save QR sticker (PNG)</button></div>
  </div>
  <div id="own" class="card p-4 text-sm hidden"></div>
  <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="kp"></div>
@@ -26,8 +26,8 @@
 <script>
 let sid,c1,c2,c3;
 function qrImg(){const c=$('qr').querySelector('canvas');return c?c.toDataURL('image/png'):$('qr').querySelector('img').src}
-function printQR(){const r=shopRecs(sid).pop(),w=window.open('');w.document.write(`<body style="text-align:center;font-family:sans-serif"><h2>${esc(r.name)}</h2><img src="${qrImg()}" width="260"><p>Scan to open the H800 inspection form</p></body>`);w.document.close();setTimeout(()=>w.print(),300)}
-function saveQR(){const a=document.createElement('a');a.href=qrImg();a.download='qr-'+sid+'.png';a.click()}
+function printQR(){const r=shopRecs(sid).pop(),u=stickerCanvas(r.name,shopUrl(sid)).toDataURL('image/png'),w=window.open('');w.document.write(`<body style="margin:0;text-align:center"><img src="${u}" style="width:90mm"></body>`);w.document.close();setTimeout(()=>w.print(),400)}
+function saveQR(){const r=shopRecs(sid).pop(),a=document.createElement('a');a.href=stickerCanvas(r.name,shopUrl(sid)).toDataURL('image/png');a.download='QR-'+fileSafe(r.name)+'.png';a.click()}
 async function delOne(id){if(confirm('Delete this inspection record?')){await delRec(id);draw()}}
 function draw(){
  const all=shopRecs(sid);if(!all.length){location.href='index.html';return}

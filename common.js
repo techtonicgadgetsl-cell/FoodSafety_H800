@@ -114,9 +114,31 @@ async function publishShop(sid){
 }
 const pinIcon=g=>L.divIcon({className:'',iconSize:[34,44],iconAnchor:[17,44],popupAnchor:[0,-40],html:`<svg viewBox="0 0 34 44" width="34" height="44" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))"><path d="M17 1C8 1 1 8 1 17c0 12 16 26 16 26s16-14 16-26C33 8 26 1 17 1z" fill="${G[g].col}" stroke="#fff" stroke-width="2"/><text x="17" y="23" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="Arial">${g}</text></svg>`});
 
+
+/* ---- QR sticker (title + QR + shop name) ---- */
+const STK_T1='Food Safety Inspection',STK_T2='H800 (Food Safety Grading)';
+function stickerCanvas(name,url){
+ const W=600,H=780,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ x.fillStyle='#fff';x.fillRect(0,0,W,H);
+ x.strokeStyle='#0f766e';x.lineWidth=8;x.strokeRect(14,14,W-28,H-28);
+ x.fillStyle='#0f766e';x.fillRect(14,14,W-28,150);
+ x.fillStyle='#fff';x.textAlign='center';x.textBaseline='middle';
+ x.font='bold 44px Arial';x.fillText(STK_T1,W/2,72);
+ x.font='bold 30px Arial';x.fillText(STK_T2,W/2,124);
+ const d=document.createElement('div');new QRCode(d,{text:url,width:400,height:400,correctLevel:QRCode.CorrectLevel.M});
+ const q=d.querySelector('canvas');x.imageSmoothingEnabled=false;x.drawImage(q,100,190,400,400);
+ x.fillStyle='#0f172a';x.font='bold 36px Arial';
+ const words=String(name).split(' '),lines=[];let cur='';
+ words.forEach(w=>{const t=cur?cur+' '+w:w;if(x.measureText(t).width>W-80&&cur){lines.push(cur);cur=w}else cur=t});lines.push(cur);
+ lines.slice(0,2).forEach((l,i)=>x.fillText(l,W/2,636+i*44));
+ x.fillStyle='#475569';x.font='24px Arial';x.fillText('Scan to see the grade',W/2,H-50);
+ return c;
+}
+const fileSafe=s=>String(s).replace(/[^\w\-]+/g,'_').slice(0,40);
+
 /* ---- Nav ---- */
 function nav(a){
- const L=[['index.html','🏠','Dashboard','d'],['inspection.html','➕','Inspect','i'],['map.html','🗺️','Map','m'],['setup.html','⚙️','Setup','s']],S=window.H800_SET||{};
+ const L=[['index.html','🏠','Dashboard','d'],['inspection.html','➕','Inspect','i'],['map.html','🗺️','Map','m'],['qrsheet.html','🔲','QR','q'],['setup.html','⚙️','Setup','s']],S=window.H800_SET||{};
  const so=FB_ON?`<button onclick="auth.signOut().then(()=>location.reload())" class="px-3 py-1.5 rounded-lg bg-white/15 text-sm">Sign out</button>`:'';
  $('nav').innerHTML=`<header class="hdr sticky top-0 z-[1000] shadow"><div class="max-w-[1920px] lg:px-6 mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
  <div class="flex items-center gap-2"><span class="text-2xl">🍽️</span><div class="leading-tight"><b>H800 Food Premises Grading</b><div class="text-[11px] opacity-80">${esc(S.office||'Open Setup to set your area')}</div></div></div>
