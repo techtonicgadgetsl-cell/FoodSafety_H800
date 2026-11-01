@@ -22,6 +22,14 @@
     <button id="fin" onclick="finish()" class="hidden bg-blue-600 text-white rounded px-4 py-2 font-medium">Finish &amp; save</button></div></div>
  </div></div>
 
+
+<div id="loc" class="hidden fixed inset-0 z-[4000] bg-white flex flex-col">
+ <div class="p-3 flex items-center justify-between bg-emerald-700 text-white text-sm"><b>📍 Select premise location</b><button type="button" onclick="closeLoc()" class="text-2xl leading-none px-2">×</button></div>
+ <div id="pickMap" class="flex-1"></div>
+ <div class="p-3 border-t flex flex-wrap items-center justify-between gap-2 text-sm" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
+  <div id="coords" class="text-slate-600 text-xs">(tap the map to place the pin)</div>
+  <div class="flex gap-2"><button type="button" onclick="closeLoc()" class="border rounded px-4 py-2">Cancel</button><button type="button" onclick="okLoc()" class="bg-emerald-600 text-white rounded px-5 py-2 font-medium">OK – Save location</button></div></div>
+</div>
 <div id="res" class="hidden fixed inset-0 bg-black/60 z-[3000] flex items-center justify-center p-3"><div class="bg-white rounded-xl max-w-sm w-full p-5 text-center space-y-2" id="resBody"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
@@ -36,21 +44,32 @@ function build(){
  `<div id="st_basic" class="grid md:grid-cols-2 gap-3">${inp('f_name','Name of the premise')}
   <label class="text-xs block">Category<select id="f_cat" class="w-full border rounded p-2 text-sm"><option value="FF">Food Factory (FF)</option><option value="HT">Hotel (HT)</option><option value="BK">Bakery (BK)</option><option value="TS" selected>Tea kiosk / snack bar (TS)</option><option value="DS">Grocery (DS)</option><option value="SM">Supermarket (SM)</option><option value="OT">Others (OT)</option></select></label>
   ${inp('f_addr','Address of the premise')}${inp('f_owner','Owner / manager')}${inp('f_nic','NIC number')}${inp('f_tel','Telephone')}${inp('f_date','Date','date')}
-  <div class="md:col-span-2"><p class="text-xs font-medium mb-1">📍 Premise location <b class="text-rose-600">*</b> – search a place, switch Street/Satellite (top right), then tap the map on the shop <button type="button" onclick="gps()" class="ml-2 border rounded px-2 py-0.5">Use my location</button> <span id="coords" class="text-slate-500"></span><br><span id="acc" class="text-blue-700"></span></p>
-  <div id="pickMap" class="h-64 rounded-lg border"></div></div></div>`+
+  <div class="md:col-span-2"><p class="text-xs font-medium mb-1">📍 Premise location <b class="text-rose-600">*</b></p>
+  <button type="button" onclick="openLoc()" class="w-full border-2 border-dashed border-emerald-400 rounded-lg p-3 text-sm font-medium text-emerald-700">🗺️ Set location on map</button>
+  <p id="locState" class="text-xs mt-1 text-slate-500">(not set)</p></div></div>`+
  SECS.map(s=>`<div id="st_${s.id}" class="hidden space-y-3"><div class="flex items-center justify-between bg-emerald-50 rounded p-2">
    <span class="text-xs">Marks: <b id="sub_${s.id}"></b></span><button type="button" id="tg_${s.id}" onclick="ON['${s.id}']=!ON['${s.id}'];recalc()" class="px-3 py-1 rounded-full text-xs font-bold"></button></div>
   <p id="off_${s.id}" class="hidden text-sm text-slate-500 p-3 text-center">Section switched OFF – not inspected, excluded from the score.</p>
   <div id="body_${s.id}">${s.na?`<label class="block text-xs p-2 mb-2 rounded bg-amber-50"><input type="checkbox" id="na_${s.id}" onchange="recalc()"> Not applicable: ${s.na.l}</label>`:''}
   <div class="grid md:grid-cols-2 gap-3">${s.items.map(i=>`<label class="text-xs" id="w_${i[0]}">${i[1]}<select id="m_${i[0]}" onchange="recalc()" class="w-full border rounded p-2 text-sm mt-1">${i[2].map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select></label>`).join('')}</div></div></div>`).join('')+
  `<div id="st_final" class="hidden space-y-3"><label class="text-xs block">Remark / advice<textarea id="f_rem" rows="3" class="w-full border rounded p-2 text-sm"></textarea></label></div>`;
- pickMap=L.map('pickMap').setView([7.5,80.7],7);mapTools(pickMap,{locate:false});
- addArea(pickMap).then(a=>areaL=a);
- pickMap.on('click',e=>{if(pickMap._stopLoc)pickMap._stopLoc();setPick({lat:e.latlng.lat,lng:e.latlng.lng})});
 }
-function setPick(p){chosen=p;if(pm){pickMap.removeLayer(pm);pm=null}
- if(p){pm=L.marker([p.lat,p.lng]).addTo(pickMap);$('coords').textContent=p.lat.toFixed(5)+', '+p.lng.toFixed(5)}else $('coords').textContent='(not set)'}
-function gps(){locateMe(pickMap,{status:t=>$('acc').textContent=t,fix:b=>setPick({lat:b.lat,lng:b.lng})})}
+let tmp=null;
+function mark(p){tmp=p;if(!pickMap)return;if(pm){pickMap.removeLayer(pm);pm=null}
+ if(p){pm=L.marker([p.lat,p.lng]).addTo(pickMap);$('coords').textContent=p.lat.toFixed(5)+', '+p.lng.toFixed(5)}else $('coords').textContent='(tap the map to place the pin)'}
+function updLoc(){$('locState').innerHTML=chosen?`<span class="text-emerald-700 font-semibold">✔ Location saved</span> <span class="text-slate-500">(${chosen.lat.toFixed(5)}, ${chosen.lng.toFixed(5)})</span> · <button type="button" onclick="openLoc()" class="underline text-blue-700">Change</button>`:'(not set)'}
+function toast(t){const d=document.createElement('div');d.textContent=t;d.className='fixed left-1/2 -translate-x-1/2 top-6 z-[6000] bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-lg font-semibold';document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
+function openLoc(){
+ $('loc').classList.remove('hidden');
+ if(!pickMap){pickMap=L.map('pickMap').setView([7.5,80.7],7);mapTools(pickMap,{onFix:b=>mark({lat:b.lat,lng:b.lng})});addArea(pickMap).then(a=>areaL=a);
+  pickMap.on('click',e=>{if(pickMap._stopLoc)pickMap._stopLoc();mark({lat:e.latlng.lat,lng:e.latlng.lng})})}
+ mark(chosen);
+ setTimeout(()=>{pickMap.invalidateSize();if(chosen)pickMap.setView([chosen.lat,chosen.lng],17);else if(areaL)pickMap.fitBounds(areaL.getBounds())},120);
+}
+function closeLoc(){if(pickMap&&pickMap._stopLoc)pickMap._stopLoc();$('loc').classList.add('hidden')}
+function okLoc(){
+ if(!tmp){alert('Tap the map (or press “My location”) to place the pin first.');return}
+ chosen=tmp;closeLoc();updLoc();toast('✔ Location saved')}
 function recalc(){
  const marks={},na={},subs={};let total=0,denom=0,n=0;
  SECS.forEach(s=>{const on=ON[s.id];na[s.id]=!!(s.na&&$('na_'+s.id).checked);let t=0,m=0;if(on)n++;
@@ -70,7 +89,6 @@ function go(i){
  $('stepN').textContent=`Step ${i+1} of ${STEPS.length}`;$('prog').style.width=((i+1)/STEPS.length*100)+'%';
  $('bk').classList.toggle('invisible',i===0);$('nx').classList.toggle('hidden',i===STEPS.length-1);$('fin').classList.toggle('hidden',i!==STEPS.length-1);
  $('stepBody').scrollTop=0;
- if(k==='basic')setTimeout(()=>{pickMap.invalidateSize();if(chosen)pickMap.setView([chosen.lat,chosen.lng],17);else if(areaL)pickMap.fitBounds(areaL.getBounds())},200);
 }
 function next(){
  if(step===0&&(!$('f_name').value.trim()||!$('f_owner').value.trim())){alert('Premise name and owner/manager are required.');return}
@@ -81,7 +99,7 @@ function openWiz(i){$('wiz').classList.remove('hidden');go(i)}
 function closeWiz(){if(confirm('Close the inspection? Unsaved marks will be lost.'))$('wiz').classList.add('hidden')}
 function reset(){
  ['f_name','f_addr','f_owner','f_nic','f_tel','f_rem'].forEach(i=>$(i).value='');$('f_date').value=today();
- SECS.forEach(s=>{ON[s.id]=true;if(s.na)$('na_'+s.id).checked=false;s.items.forEach(i=>$('m_'+i[0]).selectedIndex=0)});setPick(null);recalc();
+ SECS.forEach(s=>{ON[s.id]=true;if(s.na)$('na_'+s.id).checked=false;s.items.forEach(i=>$('m_'+i[0]).selectedIndex=0)});chosen=null;mark(null);updLoc();recalc();
 }
 async function finish(){
  const r=recalc();if(!r.denom){alert('Switch at least one section ON.');return}
@@ -105,7 +123,7 @@ boot('i',()=>{
  const q=new URLSearchParams(location.search),sid=q.get('shop'),re=q.get('re');
  const r=sid?shopRecs(sid).pop():re?recs.find(x=>x.id===+re):null;
  if(r){$('f_name').value=r.name;$('f_addr').value=r.addr||'';$('f_owner').value=r.owner;$('f_nic').value=r.nic||'';$('f_tel').value=r.tel||'';$('f_cat').value=r.cat;
-  if(r.lat!=null){setPick({lat:r.lat,lng:r.lng});pickMap.setView([r.lat,r.lng],17)}}
+  if(r.lat!=null){chosen={lat:r.lat,lng:r.lng};updLoc()}}
  else if(sid)alert('Shop not found in the records.');
  openWiz(0);
 });
