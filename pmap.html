@@ -21,7 +21,7 @@ function draw(){
   if(r.sid===sid)open=m});
 }
 (async()=>{
- map=L.map('map').setView([7.5,80.7],7);tile().addTo(map);mk=L.layerGroup().addTo(map);legend();
+ map=L.map('map').setView([7.5,80.7],7);mapTools(map);mk=L.layerGroup().addTo(map);legend();
  const a=await addArea(map);
  if(!FB_ON){alert('Not set up yet.');return}
  try{P=(await db.collection('h800_public').get()).docs.map(d=>d.data())}catch(e){alert('Could not load: '+e.message);return}

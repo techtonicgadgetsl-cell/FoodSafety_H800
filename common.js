@@ -62,6 +62,57 @@ async function addArea(map){
 }
 const tile=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'});
 
+
+/* ---- Map tools: Street / Satellite / Topo, place search, GPS with accuracy ---- */
+const OSM=()=>L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'});
+const SAT=()=>L.layerGroup([L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'}),L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19})]);
+const accTxt=a=>'GPS ±'+Math.round(a)+' m '+(a<=10?'(good)':a<=30?'(fair)':'(low – go outside / tap the map to adjust)');
+function locateMe(map,o={}){
+ if(!navigator.geolocation){alert('Location not available.');return}
+ if(map._stopLoc)map._stopLoc();
+ if(map._meLay)map.removeLayer(map._meLay);
+ const lay=L.layerGroup().addTo(map);map._meLay=lay;let best=null,first=true,w,t;
+ const stop=()=>{navigator.geolocation.clearWatch(w);clearTimeout(t);map._stopLoc=null};
+ map._stopLoc=stop;
+ w=navigator.geolocation.watchPosition(p=>{
+  const ll=[p.coords.latitude,p.coords.longitude],acc=p.coords.accuracy;
+  lay.clearLayers();
+  const c=L.circle(ll,{radius:acc,color:'#2563eb',weight:1,fillColor:'#3b82f6',fillOpacity:.15}).addTo(lay);
+  L.circleMarker(ll,{radius:7,color:'#fff',weight:2,fillColor:'#2563eb',fillOpacity:1}).addTo(lay);
+  if(first){first=false;map.fitBounds(c.getBounds(),{maxZoom:19,padding:[20,20]})}
+  if(!best||acc<best.acc){best={lat:ll[0],lng:ll[1],acc};o.fix&&o.fix(best)}
+  o.status&&o.status(accTxt(acc));
+  if(acc<=8)stop();
+ },e=>{stop();alert('Could not get location ('+e.message+'). Search or tap the map instead.')},{enableHighAccuracy:true,timeout:20000,maximumAge:0});
+ t=setTimeout(stop,20000);
+}
+function mapTools(map,o={}){
+ const topo=tile(),street=OSM(),sat=SAT(),B={'Street':street,'Satellite':sat,'Topo':topo};let k='Topo';
+ try{k=localStorage.getItem('h800_base')||'Topo'}catch(e){}
+ (B[k]||topo).addTo(map);
+ L.control.layers(B,null,{position:'topright'}).addTo(map);
+ map.on('baselayerchange',e=>{try{localStorage.setItem('h800_base',e.name)}catch(x){}});
+ const S=L.control({position:'topleft'});
+ S.onAdd=()=>{
+  const d=L.DomUtil.create('div');d.style.cssText='background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);padding:4px;width:min(270px,62vw)';
+  d.innerHTML='<div style="display:flex;gap:4px"><input type="search" placeholder="Search place…" style="flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:16px"><button type="button" class="sb" style="border:0;background:#0d9488;color:#fff;border-radius:6px;padding:0 10px">🔍</button></div><div class="res" style="max-height:190px;overflow:auto;font-size:12px"></div>'
+   +(o.locate!==false?'<div style="margin-top:4px;display:flex;gap:6px;align-items:center"><button type="button" class="lb" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px">📍 My location</button><span class="ac" style="font-size:11px;color:#475569"></span></div>':'');
+  L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);
+  const inp=d.querySelector('input'),res=d.querySelector('.res');let mk=null;
+  const go=async()=>{const q=inp.value.trim();if(!q)return;res.innerHTML='<div style="padding:4px">Searching…</div>';
+   try{const r=await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=lk&q='+encodeURIComponent(q))).json();
+    if(!r.length){res.innerHTML='<div style="padding:4px">No results.</div>';return}
+    res.innerHTML=r.map((x,i)=>`<div data-i="${i}" style="padding:5px 4px;border-top:1px solid #e2e8f0;cursor:pointer">${esc(x.display_name)}</div>`).join('');
+    res.onclick=e=>{const n=e.target.closest('[data-i]');if(!n)return;const x=r[+n.dataset.i];
+     if(mk)map.removeLayer(mk);mk=L.circleMarker([+x.lat,+x.lon],{radius:8,color:'#fff',weight:2,fillColor:'#e11d48',fillOpacity:1}).addTo(map);
+     if(x.boundingbox&&x.type!=='house')map.fitBounds([[+x.boundingbox[0],+x.boundingbox[2]],[+x.boundingbox[1],+x.boundingbox[3]]],{maxZoom:18});else map.setView([+x.lat,+x.lon],18);res.innerHTML=''}
+   }catch(e){res.innerHTML='<div style="padding:4px;color:#e11d48">Search failed (internet?).</div>'}};
+  d.querySelector('.sb').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()};
+  const lb=d.querySelector('.lb');if(lb)lb.onclick=()=>locateMe(map,{status:t=>d.querySelector('.ac').textContent=t});
+  return d};
+ S.addTo(map);
+}
+
 /* ---- Helpers ---- */
 const sidOf=r=>{let h=5381;const s=pk(r);for(let i=0;i<s.length;i++)h=(h*33^s.charCodeAt(i))>>>0;return h.toString(36)};
 const baseUrl=()=>(window.APP_URL||location.href.replace(/[^\/]*([?#].*)?$/,'')).replace(/\/?$/,'/');

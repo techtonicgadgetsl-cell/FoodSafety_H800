@@ -20,7 +20,7 @@ boot('m',()=>{
 const SHOW={A:1,B:1,C:1,D:1};window.SHOW=SHOW;
 function legend(){$('legend').innerHTML='<b>Show:</b> '+GRADES.map(x=>`<button onclick="SHOW['${x.g}']=!SHOW['${x.g}'];legend();markers()" class="px-3 py-1 rounded-full border text-xs font-semibold" style="${SHOW[x.g]?`background:${x.col};color:#fff;border-color:${x.col}`:'opacity:.45'}">${x.g} · ${rangeTxt(x.g)} · ${x.name}</button>`).join(' ')}
 window.legend=legend;legend();
-const map=L.map('map').setView([7.5,80.7],7);tile().addTo(map);
+const map=L.map('map').setView([7.5,80.7],7);mapTools(map);
 let area=null;const mk=L.layerGroup().addTo(map);
 function pin(r){const c=G[r.grade].col;
  return L.divIcon({className:'',iconSize:[34,44],iconAnchor:[17,44],popupAnchor:[0,-40],html:`<svg viewBox="0 0 34 44" width="34" height="44" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))"><path d="M17 1C8 1 1 8 1 17c0 12 16 26 16 26s16-14 16-26C33 8 26 1 17 1z" fill="${c}" stroke="#fff" stroke-width="2"/><text x="17" y="23" text-anchor="middle" font-size="16" font-weight="700" fill="#fff" font-family="Arial">${r.grade}</text></svg>`})}

@@ -36,7 +36,7 @@ function build(){
  `<div id="st_basic" class="grid md:grid-cols-2 gap-3">${inp('f_name','Name of the premise')}
   <label class="text-xs block">Category<select id="f_cat" class="w-full border rounded p-2 text-sm"><option value="FF">Food Factory (FF)</option><option value="HT">Hotel (HT)</option><option value="BK">Bakery (BK)</option><option value="TS" selected>Tea kiosk / snack bar (TS)</option><option value="DS">Grocery (DS)</option><option value="SM">Supermarket (SM)</option><option value="OT">Others (OT)</option></select></label>
   ${inp('f_addr','Address of the premise')}${inp('f_owner','Owner / manager')}${inp('f_nic','NIC number')}${inp('f_tel','Telephone')}${inp('f_date','Date','date')}
-  <div class="md:col-span-2"><p class="text-xs font-medium mb-1">📍 Premise location <b class="text-rose-600">*</b> – tap the map on the shop <button type="button" onclick="gps()" class="ml-2 border rounded px-2 py-0.5">Use my location</button> <span id="coords" class="text-slate-500"></span></p>
+  <div class="md:col-span-2"><p class="text-xs font-medium mb-1">📍 Premise location <b class="text-rose-600">*</b> – search a place, switch Street/Satellite (top right), then tap the map on the shop <button type="button" onclick="gps()" class="ml-2 border rounded px-2 py-0.5">Use my location</button> <span id="coords" class="text-slate-500"></span><br><span id="acc" class="text-blue-700"></span></p>
   <div id="pickMap" class="h-64 rounded-lg border"></div></div></div>`+
  SECS.map(s=>`<div id="st_${s.id}" class="hidden space-y-3"><div class="flex items-center justify-between bg-emerald-50 rounded p-2">
    <span class="text-xs">Marks: <b id="sub_${s.id}"></b></span><button type="button" id="tg_${s.id}" onclick="ON['${s.id}']=!ON['${s.id}'];recalc()" class="px-3 py-1 rounded-full text-xs font-bold"></button></div>
@@ -44,18 +44,13 @@ function build(){
   <div id="body_${s.id}">${s.na?`<label class="block text-xs p-2 mb-2 rounded bg-amber-50"><input type="checkbox" id="na_${s.id}" onchange="recalc()"> Not applicable: ${s.na.l}</label>`:''}
   <div class="grid md:grid-cols-2 gap-3">${s.items.map(i=>`<label class="text-xs" id="w_${i[0]}">${i[1]}<select id="m_${i[0]}" onchange="recalc()" class="w-full border rounded p-2 text-sm mt-1">${i[2].map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select></label>`).join('')}</div></div></div>`).join('')+
  `<div id="st_final" class="hidden space-y-3"><label class="text-xs block">Remark / advice<textarea id="f_rem" rows="3" class="w-full border rounded p-2 text-sm"></textarea></label></div>`;
- pickMap=L.map('pickMap').setView([7.5,80.7],7);tile().addTo(pickMap);
+ pickMap=L.map('pickMap').setView([7.5,80.7],7);mapTools(pickMap,{locate:false});
  addArea(pickMap).then(a=>areaL=a);
- pickMap.on('click',e=>setPick({lat:e.latlng.lat,lng:e.latlng.lng}));
+ pickMap.on('click',e=>{if(pickMap._stopLoc)pickMap._stopLoc();setPick({lat:e.latlng.lat,lng:e.latlng.lng})});
 }
 function setPick(p){chosen=p;if(pm){pickMap.removeLayer(pm);pm=null}
  if(p){pm=L.marker([p.lat,p.lng]).addTo(pickMap);$('coords').textContent=p.lat.toFixed(5)+', '+p.lng.toFixed(5)}else $('coords').textContent='(not set)'}
-function gps(){
- if(!navigator.geolocation){alert('Location not available.');return}
- navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];
-  if(me)pickMap.removeLayer(me);me=L.marker(ll,{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[16,16]})}).addTo(pickMap);setPick({lat:ll[0],lng:ll[1]});pickMap.setView(ll,18)},
-  ()=>alert('Could not get location. Tap the map instead.'),{enableHighAccuracy:true,timeout:15000});
-}
+function gps(){locateMe(pickMap,{status:t=>$('acc').textContent=t,fix:b=>setPick({lat:b.lat,lng:b.lng})})}
 function recalc(){
  const marks={},na={},subs={};let total=0,denom=0,n=0;
  SECS.forEach(s=>{const on=ON[s.id];na[s.id]=!!(s.na&&$('na_'+s.id).checked);let t=0,m=0;if(on)n++;
