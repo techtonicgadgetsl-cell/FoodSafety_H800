@@ -4,10 +4,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 @page{size:A4;margin:8mm}
-#sheet{display:grid;gap:4mm;grid-template-columns:repeat(var(--cols,2),1fr)}
-#sheet .stk{break-inside:avoid;text-align:center}
-#sheet img{width:100%;display:block}
-@media print{#nav,.bnav,.noprint{display:none!important}body{background:#fff!important;padding:0!important}main{padding:0!important;max-width:none!important}}
+#sheet{display:flex;flex-direction:column;align-items:center;gap:12px}
+.pg{display:grid;gap:3mm;width:100%;max-width:620px;aspect-ratio:194/279;background:#fff;border:1px solid #cbd5e1;padding:2mm;box-sizing:border-box}
+.pg .stk{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0}
+.pg img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+@media print{.pg{max-width:none;width:194mm;height:279mm;aspect-ratio:auto;border:0;padding:0;page-break-after:always;break-after:page}.pg:last-child{page-break-after:auto;break-after:auto}#sheet{display:block}#nav,.bnav,.noprint{display:none!important}body{background:#fff!important;padding:0!important}main{padding:0!important;max-width:none!important}}
 </style></head>
 <body class="text-slate-800"><div id="nav"></div>
 <main class="max-w-[1100px] mx-auto p-3 space-y-3">
@@ -15,7 +16,7 @@
  <div class="card p-3 noprint space-y-2">
   <div class="flex flex-wrap gap-2 items-center text-sm">
    <label class="flex items-center gap-1"><input type="checkbox" id="all" checked> Select all</label>
-   <label class="ml-3 flex items-center gap-1"><input type="checkbox" id="inc" checked> Add owner login code (cut-off strip)</label><label class="ml-3">Per row <select id="cols" class="border rounded px-2 py-1"><option>2</option><option>3</option><option>4</option></select></label>
+   <label class="ml-3 flex items-center gap-1"><input type="checkbox" id="inc" checked> Add owner login code (cut-off strip)</label><label class="ml-3">Per A4 page <select id="cols" class="border rounded px-2 py-1"><option value="2x1">2</option><option value="2x2" selected>4 (2×2)</option><option value="3x2">6 (3×2)</option><option value="4x2">8 (4×2)</option></select></label>
    <button onclick="window.print()" class="bg-emerald-600 text-white rounded-lg px-4 py-2 font-medium">🖨️ Print / Save as PDF</button>
    <button onclick="dlAll()" class="border rounded-lg px-4 py-2">⬇️ Download PNGs</button>
    <span id="cnt" class="text-xs text-slate-500"></span></div>
@@ -29,8 +30,11 @@ let SH=[];const sel=new Set(),CODES={};
 function draw(){
  const chosen=SH.filter(r=>sel.has(sidOf(r)));
  $('cnt').textContent=chosen.length+' of '+SH.length+' selected';
- document.documentElement.style.setProperty('--cols',$('cols').value);
- $('sheet').innerHTML=chosen.map(r=>`<div class="stk"><img src="${stickerCanvas(r.name,shopUrl(sidOf(r)),$('inc').checked?CODES[sidOf(r)]:null).toDataURL('image/png')}"></div>`).join('')||'<p class="text-slate-400 text-center p-6 noprint">No shops selected.</p>';
+ const [cs,rs]=$('cols').value.split('x').map(Number),per=cs*rs;let h='';
+ for(let i=0;i<chosen.length;i+=per){
+  h+=`<div class="pg" style="grid-template-columns:repeat(${cs},1fr);grid-template-rows:repeat(${rs},1fr)">`+chosen.slice(i,i+per).map(r=>`<div class="stk"><img src="${stickerCanvas(r.name,shopUrl(sidOf(r)),$('inc').checked?CODES[sidOf(r)]:null).toDataURL('image/png')}"></div>`).join('')+'</div>';
+ }
+ $('sheet').innerHTML=h||'<p class="text-slate-400 text-center p-6 noprint">No shops selected.</p>';
 }
 function dlAll(){
  SH.filter(r=>sel.has(sidOf(r))).forEach((r,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=stickerCanvas(r.name,shopUrl(sidOf(r)),$('inc').checked?CODES[sidOf(r)]:null).toDataURL('image/png');a.download='QR-'+fileSafe(r.name)+'.png';a.click()},i*400));
