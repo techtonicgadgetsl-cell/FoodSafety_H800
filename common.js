@@ -178,10 +178,10 @@ const pinIcon=g=>L.divIcon({className:'',iconSize:[34,44],iconAnchor:[17,44],pop
 
 /* ---- QR sticker (title + QR + shop name) ---- */
 const STK_T1='Food Safety Inspection',STK_T2='H800 (Food Safety Grading)';
-function stickerCanvas(name,url){
- const W=600,H=780,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+function stickerCanvas(name,url,code){
+ const W=600,SH=780,H=code?960:780,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
  x.fillStyle='#fff';x.fillRect(0,0,W,H);
- x.strokeStyle='#0f766e';x.lineWidth=8;x.strokeRect(14,14,W-28,H-28);
+ x.strokeStyle='#0f766e';x.lineWidth=8;x.strokeRect(14,14,W-28,SH-28);
  x.fillStyle='#0f766e';x.fillRect(14,14,W-28,150);
  x.fillStyle='#fff';x.textAlign='center';x.textBaseline='middle';
  x.font='bold 44px Arial';x.fillText(STK_T1,W/2,72);
@@ -192,7 +192,17 @@ function stickerCanvas(name,url){
  const words=String(name).split(' '),lines=[];let cur='';
  words.forEach(w=>{const t=cur?cur+' '+w:w;if(x.measureText(t).width>W-80&&cur){lines.push(cur);cur=w}else cur=t});lines.push(cur);
  lines.slice(0,2).forEach((l,i)=>x.fillText(l,W/2,636+i*44));
- x.fillStyle='#475569';x.font='24px Arial';x.fillText('Scan to see the grade',W/2,H-50);
+ x.fillStyle='#475569';x.font='24px Arial';x.fillText('Scan to see the grade',W/2,SH-50);
+ if(code){
+  x.strokeStyle='#64748b';x.lineWidth=2;x.setLineDash([10,8]);x.beginPath();x.moveTo(14,SH+22);x.lineTo(W-14,SH+22);x.stroke();
+  x.setLineDash([]);x.font='20px Arial';const ct='\u2702  cut here – lower part is for the shop owner',cw=x.measureText(ct).width;
+  x.fillStyle='#fff';x.fillRect(W/2-cw/2-10,SH+8,cw+20,28);x.fillStyle='#64748b';x.fillText(ct,W/2,SH+23);
+  x.fillStyle='#fff';
+  x.strokeStyle='#0f766e';x.lineWidth=4;x.strokeRect(40,SH+52,W-80,110);
+  x.fillStyle='#0f172a';x.font='bold 24px Arial';x.fillText('Shop owner login code',W/2,SH+82);
+  x.font='bold 54px Courier New';if('letterSpacing' in x)x.letterSpacing='8px';x.fillText(code,W/2+4,SH+130);if('letterSpacing' in x)x.letterSpacing='0px';
+  x.fillStyle='#475569';x.font='18px Arial';x.fillText('Scan the QR \u2192 “Shop owner” box → enter this code. Keep it private.',W/2,SH+185);
+ }
  return c;
 }
 const fileSafe=s=>String(s).replace(/[^\w\-]+/g,'_').slice(0,40);

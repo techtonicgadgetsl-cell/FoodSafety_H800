@@ -15,7 +15,7 @@
  <div class="card p-3 noprint space-y-2">
   <div class="flex flex-wrap gap-2 items-center text-sm">
    <label class="flex items-center gap-1"><input type="checkbox" id="all" checked> Select all</label>
-   <label class="ml-3">Per row <select id="cols" class="border rounded px-2 py-1"><option>2</option><option>3</option><option>4</option></select></label>
+   <label class="ml-3 flex items-center gap-1"><input type="checkbox" id="inc" checked> Add owner login code (cut-off strip)</label><label class="ml-3">Per row <select id="cols" class="border rounded px-2 py-1"><option>2</option><option>3</option><option>4</option></select></label>
    <button onclick="window.print()" class="bg-emerald-600 text-white rounded-lg px-4 py-2 font-medium">🖨️ Print / Save as PDF</button>
    <button onclick="dlAll()" class="border rounded-lg px-4 py-2">⬇️ Download PNGs</button>
    <span id="cnt" class="text-xs text-slate-500"></span></div>
@@ -25,21 +25,22 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
 <script src="common.js"></script>
 <script>
-let SH=[];const sel=new Set();
+let SH=[];const sel=new Set(),CODES={};
 function draw(){
  const chosen=SH.filter(r=>sel.has(sidOf(r)));
  $('cnt').textContent=chosen.length+' of '+SH.length+' selected';
  document.documentElement.style.setProperty('--cols',$('cols').value);
- $('sheet').innerHTML=chosen.map(r=>`<div class="stk"><img src="${stickerCanvas(r.name,shopUrl(sidOf(r))).toDataURL('image/png')}"></div>`).join('')||'<p class="text-slate-400 text-center p-6 noprint">No shops selected.</p>';
+ $('sheet').innerHTML=chosen.map(r=>`<div class="stk"><img src="${stickerCanvas(r.name,shopUrl(sidOf(r)),$('inc').checked?CODES[sidOf(r)]:null).toDataURL('image/png')}"></div>`).join('')||'<p class="text-slate-400 text-center p-6 noprint">No shops selected.</p>';
 }
 function dlAll(){
- SH.filter(r=>sel.has(sidOf(r))).forEach((r,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=stickerCanvas(r.name,shopUrl(sidOf(r))).toDataURL('image/png');a.download='QR-'+fileSafe(r.name)+'.png';a.click()},i*400));
+ SH.filter(r=>sel.has(sidOf(r))).forEach((r,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=stickerCanvas(r.name,shopUrl(sidOf(r)),$('inc').checked?CODES[sidOf(r)]:null).toDataURL('image/png');a.download='QR-'+fileSafe(r.name)+'.png';a.click()},i*400));
 }
 boot('q',()=>{
  SH=latest().sort((a,b)=>a.name.localeCompare(b.name));SH.forEach(r=>sel.add(sidOf(r)));
  $('list').innerHTML=SH.map(r=>`<label class="flex items-center gap-1"><input type="checkbox" class="ck" value="${sidOf(r)}" checked> ${esc(r.name)}</label>`).join('')||'<p class="text-slate-400">No shops yet.</p>';
  document.querySelectorAll('.ck').forEach(c=>c.onchange=()=>{c.checked?sel.add(c.value):sel.delete(c.value);$('all').checked=sel.size===SH.length;draw()});
  $('all').onchange=e=>{document.querySelectorAll('.ck').forEach(c=>{c.checked=e.target.checked;e.target.checked?sel.add(c.value):sel.delete(c.value)});draw()};
- $('cols').onchange=draw;draw();
+ $('cols').onchange=draw;$('inc').onchange=draw;draw();
+ if(FB_ON)(async()=>{try{for(const r of SH){CODES[sidOf(r)]=await ownerCode(sidOf(r))}}catch(e){console.warn(e)}draw()})();
 });
 </script></body></html>
