@@ -60,15 +60,15 @@ async function addArea(map){
  return L.geoJSON(g,{style:{color:'#1d4ed8',weight:2,fillColor:'#3b82f6',fillOpacity:.08},
   onEachFeature:(f,ly)=>{const p=f.properties||{},n=p.GND_N||p.name||p.NAME;if(n)ly.bindTooltip(String(n),{sticky:true})}}).addTo(map);
 }
-const tile=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:16,attribution:'Esri'});
+const tile=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:16,detectRetina:true,attribution:'Tiles &copy; Esri'});
 
 
 /* ---- Map tools: Street / Satellite / Topo, place search, GPS with accuracy ---- */
-const OSM=()=>L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,maxNativeZoom:19,attribution:'&copy; OpenStreetMap'});
+const OSM=()=>L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,maxNativeZoom:19,detectRetina:true,attribution:'&copy; OpenStreetMap'});
 const ESRI=s=>'https://server.arcgisonline.com/ArcGIS/rest/services/'+s+'/MapServer/tile/{z}/{y}/{x}';
-const SAT=(labels,roads)=>L.layerGroup([L.tileLayer(ESRI('World_Imagery'),{maxZoom:20,maxNativeZoom:18,attribution:'Esri'}),
- ...(roads?[L.tileLayer(ESRI('Reference/World_Transportation'),{maxZoom:20,maxNativeZoom:16})]:[]),
- ...(labels?[L.tileLayer(ESRI('Reference/World_Boundaries_and_Places'),{maxZoom:20,maxNativeZoom:16})]:[])]);
+const SAT=(labels,roads)=>L.layerGroup([L.tileLayer(ESRI('World_Imagery'),{maxZoom:20,maxNativeZoom:18,detectRetina:true,attribution:'Tiles &copy; Esri'}),
+ ...(roads?[L.tileLayer(ESRI('Reference/World_Transportation'),{maxZoom:20,maxNativeZoom:16,detectRetina:true})]:[]),
+ ...(labels?[L.tileLayer(ESRI('Reference/World_Boundaries_and_Places'),{maxZoom:20,maxNativeZoom:16,detectRetina:true})]:[])]);
 const accTxt=a=>'GPS ±'+Math.round(a)+' m '+(a<=10?'(good)':a<=30?'(fair)':'(low – go outside / tap the map to adjust)');
 function locateMe(map,o={}){
  if(!navigator.geolocation){alert('Location not available.');return}
@@ -90,9 +90,9 @@ function locateMe(map,o={}){
  t=setTimeout(stop,20000);
 }
 function mapTools(map,o={}){
- const topo=tile(),street=OSM(),sat=SAT(),B={'Street':street,'Satellite + Roads + Labels':SAT(1,1),'Satellite + Labels':SAT(1,0),'Satellite (clean)':sat,'Topo':topo};let k='Street';
- try{k=localStorage.getItem('h800_base')||'Street'}catch(e){}
- (B[k]||street).addTo(map);
+ const topo=tile(),street=OSM(),sat=SAT(),B={'Topo':topo,'Street':street,'Satellite':sat,'Satellite + Labels':SAT(1,1)};let k='Satellite + Labels';
+ try{k=localStorage.getItem('h800_base')||'Satellite + Labels'}catch(e){}
+ (B[k]||B['Satellite + Labels']).addTo(map);
  L.control.layers(B,null,{position:'topright'}).addTo(map);
  map.on('baselayerchange',e=>{try{localStorage.setItem('h800_base',e.name)}catch(x){}});
  const S=L.control({position:'topleft'});
