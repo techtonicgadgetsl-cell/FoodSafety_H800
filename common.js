@@ -89,6 +89,9 @@ function locateMe(map,o={}){
  },e=>{stop();alert('Could not get location ('+e.message+'). Search or tap the map instead.')},{enableHighAccuracy:true,timeout:20000,maximumAge:0});
  t=setTimeout(stop,20000);
 }
+function parseLL(t){let s=String(t).trim();try{s=decodeURIComponent(s)}catch(e){}
+ const m=s.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)||s.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/)||s.match(/[?&](?:q|ll|query|destination)=\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/)||s.match(/^(-?\d+\.\d+)\s*[, ]\s*(-?\d+\.\d+)$/);
+ if(!m)return null;const a=+m[1],b=+m[2];return Math.abs(a)<=90&&Math.abs(b)<=180?{lat:a,lng:b}:null}
 function mapTools(map,o={}){
  const topo=tile(),street=OSM(),sat=SAT(),B={'Topo':topo,'Street':street,'Satellite':sat,'Satellite + Labels':SAT(1,1)};let k='Satellite + Labels';
  try{k=localStorage.getItem('h800_base')||'Satellite + Labels'}catch(e){}
@@ -98,11 +101,14 @@ function mapTools(map,o={}){
  const S=L.control({position:'topleft'});
  S.onAdd=()=>{
   const d=L.DomUtil.create('div');d.style.cssText='background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);padding:4px;width:min(270px,62vw)';
-  d.innerHTML='<div style="display:flex;gap:4px"><input type="search" placeholder="Search place…" style="flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:16px"><button type="button" class="sb" style="border:0;background:#0d9488;color:#fff;border-radius:6px;padding:0 10px">🔍</button></div><div class="res" style="max-height:190px;overflow:auto;font-size:12px"></div>'
-   +(o.locate!==false?'<div style="margin-top:4px;display:flex;gap:6px;align-items:center"><button type="button" class="lb" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px">📍 My location</button><span class="ac" style="font-size:11px;color:#475569"></span></div>':'');
+  d.innerHTML='<div style="display:flex;gap:4px"><input type="search" placeholder="Search place / paste Google Maps link or lat,lng" style="flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:16px"><button type="button" class="sb" style="border:0;background:#0d9488;color:#fff;border-radius:6px;padding:0 10px">🔍</button></div><div class="res" style="max-height:190px;overflow:auto;font-size:12px"></div>'
+   +(o.locate!==false?'<div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a class="gm" target="_blank" rel="noopener" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px;color:#0369a1">↗ Google Maps</a><button type="button" class="lb" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px">📍 My location</button><span class="ac" style="font-size:11px;color:#475569"></span></div>':'');
   L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);
   const inp=d.querySelector('input'),res=d.querySelector('.res');let mk=null;
-  const go=async()=>{const q=inp.value.trim();if(!q)return;res.innerHTML='<div style="padding:4px">Searching…</div>';
+  const go=async()=>{const q=inp.value.trim();if(!q)return;
+   const pl=parseLL(q);
+   if(pl){if(mk)map.removeLayer(mk);mk=L.circleMarker([pl.lat,pl.lng],{radius:8,color:'#fff',weight:2,fillColor:'#e11d48',fillOpacity:1}).addTo(map);map.setView([pl.lat,pl.lng],18);res.innerHTML='<div style="padding:4px;color:#047857">✔ Location found from link / coordinates</div>';o.onFix&&o.onFix({lat:pl.lat,lng:pl.lng,acc:0});return}
+   if(/goo\.gl|maps\.app/i.test(q)){res.innerHTML='<div style="padding:4px;color:#e11d48">Short links cannot be read. Open the link, then copy the long address from the browser bar – or long-press the spot in Google Maps and copy the coordinates.</div>';return}res.innerHTML='<div style="padding:4px">Searching…</div>';
    try{const r=await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=lk&q='+encodeURIComponent(q))).json();
     if(!r.length){res.innerHTML='<div style="padding:4px">No results.</div>';return}
     res.innerHTML=r.map((x,i)=>`<div data-i="${i}" style="padding:5px 4px;border-top:1px solid #e2e8f0;cursor:pointer">${esc(x.display_name)}</div>`).join('');
@@ -111,6 +117,7 @@ function mapTools(map,o={}){
      if(x.boundingbox&&x.type!=='house')map.fitBounds([[+x.boundingbox[0],+x.boundingbox[2]],[+x.boundingbox[1],+x.boundingbox[3]]],{maxZoom:18});else map.setView([+x.lat,+x.lon],18);res.innerHTML=''}
    }catch(e){res.innerHTML='<div style="padding:4px;color:#e11d48">Search failed (internet?).</div>'}};
   d.querySelector('.sb').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()};
+  const gm=d.querySelector('.gm');if(gm)gm.onclick=()=>{const c=map.getCenter();gm.href='https://www.google.com/maps/search/?api=1&query='+c.lat.toFixed(6)+','+c.lng.toFixed(6)};
   const lb=d.querySelector('.lb');if(lb)lb.onclick=()=>locateMe(map,{status:t=>d.querySelector('.ac').textContent=t,fix:o.onFix});
   return d};
  S.addTo(map);
