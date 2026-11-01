@@ -54,7 +54,24 @@ const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open('h800',1);r.onupgra
 async function kvGet(k){try{const d=await idb();return await new Promise(res=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(null)})}catch(e){return null}}
 async function kvSet(k,v){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
 async function kvDel(k){const d=await idb();return new Promise(res=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=res})}
-async function getGeo(){return window.AREA_GEOJSON||await kvGet('area')}
+/* Auto-convert Sri Lanka Grid (Kandawala, metres) GeoJSON to WGS84 lat/lng; normal lat/lng files are left untouched */
+const SLG=(()=>{const a=6377276.345,f=1/300.8017,e2=f*(2-f),ep2=e2/(1-e2),lat0=7.0004729*Math.PI/180,lon0=80.7716944*Math.PI/180,k0=0.9999238418,FE=2e5,FN=2e5,S=Math.sin,C=Math.cos,T=Math.tan;
+ const arc=p=>a*((1-e2/4-3*e2**2/64-5*e2**3/256)*p-(3*e2/8+3*e2**2/32+45*e2**3/1024)*S(2*p)+(15*e2**2/256+45*e2**3/1024)*S(4*p)-(35*e2**3/3072)*S(6*p)),M0=arc(lat0);
+ return (E,N)=>{const M=(N-FN)/k0+M0,mu=M/(a*(1-e2/4-3*e2**2/64-5*e2**3/256)),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const p1=mu+(3*e1/2-27*e1**3/32)*S(2*mu)+(21*e1**2/16-55*e1**4/32)*S(4*mu)+(151*e1**3/96)*S(6*mu)+(1097*e1**4/512)*S(8*mu);
+  const C1=ep2*C(p1)**2,T1=T(p1)**2,N1=a/Math.sqrt(1-e2*S(p1)**2),R1=a*(1-e2)/(1-e2*S(p1)**2)**1.5,D=(E-FE)/(N1*k0);
+  const ph=p1-(N1*T(p1)/R1)*(D**2/2-(5+3*T1+10*C1-4*C1**2-9*ep2)*D**4/24+(61+90*T1+298*C1+45*T1**2-252*ep2-3*C1**2)*D**6/720);
+  const la=lon0+(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1**2+8*ep2+24*T1**2)*D**5/120)/C(p1);
+  const Nn=a/Math.sqrt(1-e2*S(ph)**2),X=Nn*C(ph)*C(la)-97,Y=Nn*C(ph)*S(la)+787,Z=Nn*(1-e2)*S(ph)+86,aw=6378137,fw=1/298.257223563,e2w=fw*(2-fw),p=Math.hypot(X,Y);
+  let lat=Math.atan2(Z,p*(1-e2w));for(let i=0;i<6;i++){const Nw=aw/Math.sqrt(1-e2w*S(lat)**2);lat=Math.atan2(Z+e2w*Nw*S(lat),p)}
+  return [+(Math.atan2(Y,X)*180/Math.PI).toFixed(6),+(lat*180/Math.PI).toFixed(6)]}})();
+function fixGeo(g){
+ if(!g)return g;let big=false;const walk=c=>{if(typeof c[0]==='number'){if(Math.abs(c[0])>360||Math.abs(c[1])>360)big=true}else c.forEach(walk)};
+ const geoms=x=>x.type==='FeatureCollection'?x.features.map(f=>f.geometry):x.type==='Feature'?[x.geometry]:[x];
+ geoms(g).forEach(m=>m&&m.coordinates&&walk(m.coordinates));if(!big)return g;
+ const cv=c=>typeof c[0]==='number'?SLG(c[0],c[1]):c.map(cv),cp=JSON.parse(JSON.stringify(g));
+ geoms(cp).forEach(m=>{if(m&&m.coordinates)m.coordinates=cv(m.coordinates)});return cp}
+async function getGeo(){return fixGeo(window.AREA_GEOJSON||await kvGet('area'))}
 async function addArea(map){
  const g=await getGeo();if(!g)return null;
  return L.geoJSON(g,{style:{color:'#1d4ed8',weight:2,fillColor:'#3b82f6',fillOpacity:.08},
