@@ -17,6 +17,11 @@
   <div class="overflow-x-auto mt-3"><table class="w-full text-xs text-left"><thead class="bg-slate-50"><tr><th class="p-1">Month</th><th class="p-1">Visits</th><th class="p-1">Avg %</th><th class="p-1">A</th><th class="p-1">B</th><th class="p-1">C</th><th class="p-1">D</th></tr></thead><tbody id="mRows" class="divide-y"></tbody></table></div></div>
 
  </div>
+
+ <div class="card p-3"><h3 class="font-semibold mb-2">🏷️ Premises by category <span class="text-xs font-normal text-slate-500">(latest grade of each premise)</span></h3>
+  <div class="grid md:grid-cols-3 gap-4"><div class="md:col-span-2 h-64"><canvas id="cC"></canvas></div><div class="h-64"><canvas id="cCp"></canvas></div></div>
+  <div class="overflow-x-auto mt-3"><table class="w-full text-xs text-left"><thead class="bg-slate-50"><tr><th class="p-1">Category</th><th class="p-1">Premises</th><th class="p-1">Avg %</th><th class="p-1">A</th><th class="p-1">B</th><th class="p-1">C</th><th class="p-1">D</th></tr></thead><tbody id="catRows" class="divide-y"></tbody></table></div></div>
+
  <div class="card"><div class="p-3 flex flex-wrap gap-2 justify-between items-center border-b"><h3 class="font-semibold">🏪 All premises</h3>
   <div class="flex gap-2"><input id="q" placeholder="Search..." class="border rounded px-2 py-1 text-sm"><button onclick="exportCSV()" class="text-sm border rounded px-2 py-1">Export CSV</button><button id="pubAll" onclick="pubAll()" class="hidden text-sm border rounded px-2 py-1">🌐 Publish all</button></div></div>
   <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Premise</th><th class="p-2 hs">Cat.</th><th class="p-2 hs">Date</th><th class="p-2">Score</th><th class="p-2">Grade</th><th class="p-2">Next due</th><th class="p-2"></th></tr></thead><tbody id="rows" class="divide-y"></tbody></table></div></div>
@@ -24,7 +29,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
 <script src="common.js"></script>
 <script>
-let dueF='month',cM,cG;
+let dueF='month',cM,cG,cC,cCp;
+const CATS=[['FF','Food Factory'],['HT','Hotel'],['BK','Bakery'],['TS','Tea kiosk / snack bar'],['DS','Grocery'],['SM','Supermarket'],['OT','Others']];
 const DF=[['over','Overdue'],['week','This week'],['month','This month'],['q','Next 3 months'],['all','All']];
 const badge=g=>`<span class="px-2 py-0.5 rounded-full text-xs font-bold ${G[g].cls}">${g}</span>`;
 function due(){
@@ -48,6 +54,16 @@ function year(){
  $('mRows').innerHTML=mo.map((a,i)=>`<tr><td class="p-1">${mn[i]}</td><td class="p-1">${a.length}</td><td class="p-1">${avg(a)??'–'}</td>${GRADES.map(x=>`<td class="p-1">${a.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`).join('')
   +`<tr class="font-semibold bg-slate-50"><td class="p-1">${y}</td><td class="p-1">${R.length}</td><td class="p-1">${avg(R)??'–'}</td>${GRADES.map(x=>`<td class="p-1">${R.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`;
 }
+function catChart(){
+ const L=latest(),rows=CATS.map(([k,n])=>{const a=L.filter(r=>r.cat===k);return {k,n,a,avg:a.length?+(a.reduce((s,r)=>s+r.pct,0)/a.length).toFixed(1):null}}).filter(x=>x.a.length);
+ cC&&cC.destroy();cCp&&cCp.destroy();
+ const lb=rows.map(x=>x.n);
+ cC=new Chart($('cC'),{type:'bar',data:{labels:lb,datasets:GRADES.map(g=>({label:'Grade '+g.g,data:rows.map(x=>x.a.filter(r=>r.grade===g.g).length),backgroundColor:g.col}))},options:{maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
+ const pal=['#0f766e','#2563eb','#f59e0b','#e11d48','#7c3aed','#0891b2','#64748b'];
+ cCp=new Chart($('cCp'),{type:'doughnut',data:{labels:lb,datasets:[{data:rows.map(x=>x.a.length),backgroundColor:rows.map(x=>pal[CATS.findIndex(c=>c[0]===x.k)])}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+ $('catRows').innerHTML=rows.map(x=>`<tr><td class="p-1">${x.n} <span class="text-slate-400">(${x.k})</span></td><td class="p-1">${x.a.length}</td><td class="p-1">${x.avg}</td>${GRADES.map(g=>`<td class="p-1">${x.a.filter(r=>r.grade===g.g).length}</td>`).join('')}</tr>`).join('')
+  +(rows.length?`<tr class="font-semibold bg-slate-50"><td class="p-1">Total</td><td class="p-1">${L.length}</td><td class="p-1">${L.length?(L.reduce((s,r)=>s+r.pct,0)/L.length).toFixed(1):'–'}</td>${GRADES.map(g=>`<td class="p-1">${L.filter(r=>r.grade===g.g).length}</td>`).join('')}</tr>`:'<tr><td colspan="7" class="p-3 text-center text-slate-400">No inspections yet.</td></tr>');
+}
 function render(){
  const L=latest();
  const st=(ic,bg,t,v,c)=>`<div class="card stat p-3 flex items-center gap-3"><div class="ic" style="background:${bg};color:${c}">${ic}</div><div><p class="text-[11px] text-slate-500">${t}</p><p class="text-2xl font-bold" style="color:${c}">${v}</p></div></div>`;
@@ -66,7 +82,7 @@ function exportCSV(){
 boot('d',()=>{
  const ys=[...new Set(recs.map(r=>r.date.slice(0,4)).concat(today().slice(0,4)))].sort().reverse();
  $('yr').innerHTML=ys.map(y=>`<option>${y}</option>`).join('');$('yr').onchange=year;$('q').oninput=render;
- render();due();year();if(FB_ON)$('pubAll').classList.remove('hidden');
+ render();due();year();catChart();if(FB_ON)$('pubAll').classList.remove('hidden');
  const S=window.H800_SET||{},L=latest(),ov=L.filter(r=>daysTo(r.next)<0).length,wk=L.filter(r=>{const d=daysTo(r.next);return d>=0&&d<=7}).length;
  $('hName').textContent=S.phi||'Welcome';$('hSub').textContent=(S.office?S.office+' · ':'')+`${L.length} premises · ${wk} due this week · ${ov} overdue`;
  if(!S.office&&!FB_ON)$('welcome').innerHTML='<div class="card p-4 border-amber-300"><b>👋 First time here?</b> Open <a class="text-emerald-700 underline" href="setup.html">Setup</a> to add your area name, Firebase and area GeoJSON – takes 2 minutes.</div>';
