@@ -107,7 +107,7 @@ function locateMe(map,o={}){
  t=setTimeout(stop,20000);
 }
 function parseLL(t){let s=String(t).trim();try{s=decodeURIComponent(s)}catch(e){}
- const m=s.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)||s.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/)||s.match(/[?&](?:q|ll|query|destination)=\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/)||s.match(/^(-?\d+\.\d+)\s*[, ]\s*(-?\d+\.\d+)$/);
+ const m=s.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/)||s.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)||s.match(/[?&](?:q|ll|query|destination)=\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/)||s.match(/^(-?\d+\.\d+)\s*[, ]\s*(-?\d+\.\d+)$/);
  if(!m)return null;const a=+m[1],b=+m[2];return Math.abs(a)<=90&&Math.abs(b)<=180?{lat:a,lng:b}:null}
 function mapTools(map,o={}){
  const topo=tile(),street=OSM(),sat=SAT(),B={'Topo':topo,'Street':street,
@@ -122,12 +122,13 @@ function mapTools(map,o={}){
  S.onAdd=()=>{
   const d=L.DomUtil.create('div');d.style.cssText='background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.3);padding:4px;width:min(270px,62vw)';
   d.innerHTML='<div style="display:flex;gap:4px"><input type="search" placeholder="Search place / paste Google Maps link or lat,lng" style="flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:16px"><button type="button" class="sb" style="border:0;background:#0d9488;color:#fff;border-radius:6px;padding:0 10px">🔍</button></div><div class="res" style="max-height:190px;overflow:auto;font-size:12px"></div>'
-   +(o.locate!==false?'<div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a class="gm" target="_blank" rel="noopener" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px;color:#0369a1">↗ Google Maps</a><button type="button" class="lb" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px">📍 My location</button><span class="ac" style="font-size:11px;color:#475569"></span></div>':'');
+   +(o.locate!==false?'<div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><a class="gm" target="_blank" rel="noopener" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px;color:#0369a1">↗ Google Maps</a>'+(o.onFix?'<button type="button" class="cb" style="border:1px solid #0d9488;background:#f0fdfa;border-radius:6px;padding:3px 8px;font-size:12px;color:#0f766e">📋 Use copied location</button>':'')+'<button type="button" class="lb" style="border:1px solid #cbd5e1;border-radius:6px;padding:3px 8px;font-size:12px">📍 My location</button><span class="ac" style="font-size:11px;color:#475569"></span></div>':'')+(o.onFix?'<div style="font-size:11px;color:#64748b;margin-top:3px">Google Maps: pick the spot, click its coordinates (or copy the page link), then come back here – it is detected automatically.</div>':'');
   L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);
   const inp=d.querySelector('input'),res=d.querySelector('.res');let mk=null;
+  const showLL=pl=>{if(mk)map.removeLayer(mk);mk=L.circleMarker([pl.lat,pl.lng],{radius:8,color:'#fff',weight:2,fillColor:'#e11d48',fillOpacity:1}).addTo(map);map.setView([pl.lat,pl.lng],18);o.onFix&&o.onFix({lat:pl.lat,lng:pl.lng,acc:0})};map._showLL=showLL;
   const go=async()=>{const q=inp.value.trim();if(!q)return;
    const pl=parseLL(q);
-   if(pl){if(mk)map.removeLayer(mk);mk=L.circleMarker([pl.lat,pl.lng],{radius:8,color:'#fff',weight:2,fillColor:'#e11d48',fillOpacity:1}).addTo(map);map.setView([pl.lat,pl.lng],18);res.innerHTML='<div style="padding:4px;color:#047857">✔ Location found from link / coordinates</div>';o.onFix&&o.onFix({lat:pl.lat,lng:pl.lng,acc:0});return}
+   if(pl){showLL(pl);res.innerHTML='<div style="padding:4px;color:#047857">✔ Location found from link / coordinates</div>';return}
    if(/goo\.gl|maps\.app/i.test(q)){res.innerHTML='<div style="padding:4px;color:#e11d48">Short links cannot be read. Open the link, then copy the long address from the browser bar – or long-press the spot in Google Maps and copy the coordinates.</div>';return}res.innerHTML='<div style="padding:4px">Searching…</div>';
    try{const r=await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=lk&q='+encodeURIComponent(q))).json();
     if(!r.length){res.innerHTML='<div style="padding:4px">No results.</div>';return}
@@ -137,10 +138,24 @@ function mapTools(map,o={}){
      if(x.boundingbox&&x.type!=='house')map.fitBounds([[+x.boundingbox[0],+x.boundingbox[2]],[+x.boundingbox[1],+x.boundingbox[3]]],{maxZoom:18});else map.setView([+x.lat,+x.lon],18);res.innerHTML=''}
    }catch(e){res.innerHTML='<div style="padding:4px;color:#e11d48">Search failed (internet?).</div>'}};
   d.querySelector('.sb').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go()};
+  const cb=d.querySelector('.cb');if(cb)cb.onclick=()=>map._clipApply&&map._clipApply(true);
   const gm=d.querySelector('.gm');if(gm)gm.onclick=()=>{const c=map.getCenter();gm.href='https://www.google.com/maps/search/?api=1&query='+c.lat.toFixed(6)+','+c.lng.toFixed(6)};
   const lb=d.querySelector('.lb');if(lb)lb.onclick=()=>locateMe(map,{status:t=>d.querySelector('.ac').textContent=t,fix:o.onFix});
   return d};
- S.addTo(map);
+S.addTo(map);
+ if(o.onFix){
+  let last='',busy=false;
+  map._clipApply=async manual=>{
+   if(busy||!map.getContainer().offsetParent)return;busy=true;
+   try{let t='';try{t=await navigator.clipboard.readText()}catch(e){if(manual)alert('Cannot read the clipboard. Allow clipboard access for this site, or paste the coordinates into the search box.');return}
+    const p=parseLL(t);
+    if(!p){if(manual)alert('No coordinates found in the clipboard.\nIn Google Maps click the coordinates (or copy the page link) first.');return}
+    if(!manual&&t===last)return;last=t;
+    if(confirm('Google Maps location found:\n'+p.lat.toFixed(6)+', '+p.lng.toFixed(6)+'\n\nPlace the pin here?'))map._showLL(p);
+   }finally{busy=false}};
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>map._clipApply(false),400)});
+  window.addEventListener('focus',()=>setTimeout(()=>map._clipApply(false),400));
+ }
 }
 
 /* ---- Helpers ---- */
