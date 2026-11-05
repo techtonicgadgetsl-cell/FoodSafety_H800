@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>H800 – Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head>
+<script src="https://cdn.tailwindcss.com"></script><script src="theme.js"></script><link rel="stylesheet" href="style.css"><style>.ch{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid #eef2f3}.ch h3{font-weight:600;font-size:15px;color:#0f172a}.chip{display:inline-block;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:500}#mRows td,#catRows td{padding:5px 0}thead th{padding-bottom:6px}</style><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head>
 <body class="bg-slate-50 text-slate-800"><div id="nav"></div>
 <main class="max-w-[1920px] lg:px-6 mx-auto p-3 space-y-4">
  <section class="hero"><p class="text-xs uppercase tracking-wider opacity-80">Public Health Inspector</p><h1 id="hName" class="text-2xl font-bold">Welcome</h1><p id="hSub" class="text-sm opacity-90"></p>
@@ -8,38 +8,50 @@
  <div id="welcome"></div>
  <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="stats"></div>
 
- <div class="grid xl:grid-cols-2 gap-4 items-start">
- <div class="card"><div class="p-3 border-b flex flex-wrap gap-2 items-center justify-between"><h3 class="font-semibold">⏰ Visits due (by next date)</h3><div id="dueF" class="flex flex-wrap gap-1 text-xs"></div></div>
-  <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Premise</th><th class="p-2">Grade</th><th class="p-2 hs">Last visit</th><th class="p-2">Next due</th><th class="p-2">Days</th><th class="p-2"></th></tr></thead><tbody id="dueRows" class="divide-y"></tbody></table></div></div>
-
- <div class="card p-3"><div class="flex flex-wrap items-center gap-2 mb-2"><h3 class="font-semibold">📈 Yearly progress</h3><select id="yr" class="border rounded px-2 py-1 text-sm"></select></div>
-  <div class="grid md:grid-cols-3 gap-4"><div class="md:col-span-2 h-60"><canvas id="cM"></canvas></div><div class="h-60"><canvas id="cG"></canvas></div></div>
-  <div class="overflow-x-auto mt-3"><table class="w-full text-xs text-left"><thead class="bg-slate-50"><tr><th class="p-1">Month</th><th class="p-1">Visits</th><th class="p-1">Avg %</th><th class="p-1">A</th><th class="p-1">B</th><th class="p-1">C</th><th class="p-1">D</th></tr></thead><tbody id="mRows" class="divide-y"></tbody></table></div></div>
-
+ <div class="grid xl:grid-cols-12 gap-4 items-stretch">
+ <div class="card xl:col-span-8 flex flex-col">
+  <div class="ch"><h3>📈 Yearly progress</h3><select id="yr" class="border rounded-lg px-2 py-1 text-sm bg-white"></select></div>
+  <div class="p-4 flex-1"><div class="h-72"><canvas id="cM"></canvas></div></div>
+  <div class="border-t px-4 py-3 overflow-x-auto"><table class="w-full text-xs text-left"><thead><tr><th class="py-1">Month</th><th class="py-1">Visits</th><th class="py-1">Avg %</th><th class="py-1">A</th><th class="py-1">B</th><th class="py-1">C</th><th class="py-1">D</th></tr></thead><tbody id="mRows" class="divide-y"></tbody></table></div>
  </div>
+ <div class="card xl:col-span-4 flex flex-col">
+  <div class="ch"><h3>🎯 Grade split</h3><span id="gYr" class="text-xs text-slate-500"></span></div>
+  <div class="p-4 flex-1 flex flex-col justify-center"><div class="h-56"><canvas id="cG"></canvas></div><div id="gLeg" class="grid grid-cols-2 gap-2 mt-4 text-sm"></div></div>
+ </div>
+</div>
 
- <div class="card p-3"><h3 class="font-semibold mb-2">🏷️ Premises by category <span class="text-xs font-normal text-slate-500">(latest grade of each premise)</span></h3>
-  <div class="grid md:grid-cols-3 gap-4"><div class="md:col-span-2 h-64"><canvas id="cC"></canvas></div><div class="h-64"><canvas id="cCp"></canvas></div></div>
-  <div class="overflow-x-auto mt-3"><table class="w-full text-xs text-left"><thead class="bg-slate-50"><tr><th class="p-1">Category</th><th class="p-1">Premises</th><th class="p-1">Avg %</th><th class="p-1">A</th><th class="p-1">B</th><th class="p-1">C</th><th class="p-1">D</th></tr></thead><tbody id="catRows" class="divide-y"></tbody></table></div></div>
+<div class="grid xl:grid-cols-12 gap-4 items-stretch">
+ <div class="card xl:col-span-7 flex flex-col">
+  <div class="ch flex-wrap"><h3>⏰ Visits due</h3><div id="dueF" class="flex flex-wrap gap-1 text-xs"></div></div>
+  <div class="overflow-x-auto flex-1"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2 pl-4">Premise</th><th class="p-2">Grade</th><th class="p-2 hs">Last visit</th><th class="p-2">Next due</th><th class="p-2">Days</th><th class="p-2"></th></tr></thead><tbody id="dueRows" class="divide-y"></tbody></table></div>
+ </div>
+ <div class="card xl:col-span-5 flex flex-col">
+  <div class="ch"><h3>🏷️ Premises by category</h3><span class="text-xs text-slate-500">latest grade</span></div>
+  <div class="p-4"><div class="h-56"><canvas id="cC"></canvas></div></div>
+  <div class="border-t px-4 py-3 overflow-x-auto mt-auto"><table class="w-full text-xs text-left"><thead><tr><th class="py-1">Category</th><th class="py-1">Premises</th><th class="py-1">Avg %</th><th class="py-1">A</th><th class="py-1">B</th><th class="py-1">C</th><th class="py-1">D</th></tr></thead><tbody id="catRows" class="divide-y"></tbody></table></div>
+ </div>
+</div>
 
- <div class="card"><div class="p-3 flex flex-wrap gap-2 justify-between items-center border-b"><h3 class="font-semibold">🏪 All premises</h3>
+ <div class="card"><div class="ch flex-wrap"><h3>🏪 All premises</h3>
   <div class="flex gap-2"><input id="q" placeholder="Search..." class="border rounded px-2 py-1 text-sm"><button onclick="exportCSV()" class="text-sm border rounded px-2 py-1">Export CSV</button><button id="pubAll" onclick="pubAll()" class="hidden text-sm border rounded px-2 py-1">🌐 Publish all</button></div></div>
   <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50"><tr><th class="p-2">Premise</th><th class="p-2 hs">Cat.</th><th class="p-2 hs">Date</th><th class="p-2">Score</th><th class="p-2">Grade</th><th class="p-2">Next due</th><th class="p-2"></th></tr></thead><tbody id="rows" class="divide-y"></tbody></table></div></div>
 </main>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
 <script src="common.js"></script>
 <script>
-let dueF='month',cM,cG,cC,cCp;
+let dueF='q',cM,cG,cC;
+Chart.defaults.font.family="'Segoe UI',system-ui,sans-serif";Chart.defaults.font.size=12;Chart.defaults.color='#64748b';Chart.defaults.borderColor='#eef2f7';Chart.defaults.plugins.legend.labels.usePointStyle=true;Chart.defaults.plugins.legend.labels.boxWidth=8;
 const CATS=[['FF','Food Factory'],['HT','Hotel'],['BK','Bakery'],['TS','Tea kiosk / snack bar'],['DS','Grocery'],['SM','Supermarket'],['OT','Others']];
 const DF=[['over','Overdue'],['week','This week'],['month','This month'],['q','Next 3 months'],['all','All']];
 const badge=g=>`<span class="px-2 py-0.5 rounded-full text-xs font-bold ${G[g].cls}">${g}</span>`;
+const okf=(f,d)=>f==='over'?d<0:f==='week'?d>=0&&d<=7:f==='month'?d>=0&&d<=30:f==='q'?d>=0&&d<=90:true;
 function due(){
- $('dueF').innerHTML=DF.map(f=>`<button onclick="dueF='${f[0]}';due()" class="px-2 py-1 rounded border ${dueF===f[0]?'bg-emerald-600 text-white':''}">${f[1]}</button>`).join('');
- const ok=d=>dueF==='over'?d<0:dueF==='week'?d>=0&&d<=7:dueF==='month'?d>=0&&d<=30:dueF==='q'?d>=0&&d<=90:true;
- const L=latest().map(r=>({r,d:daysTo(r.next)})).filter(x=>ok(x.d)).sort((a,b)=>a.d-b.d);
- $('dueRows').innerHTML=L.map(({r,d})=>`<tr><td class="p-2 font-medium">${esc(r.name)}<div class="text-xs text-slate-500">${esc(r.addr)}</div></td><td class="p-2">${badge(r.grade)}</td><td class="p-2 hs">${r.date}</td>
-  <td class="p-2">${r.next}</td><td class="p-2 ${d<0?'text-rose-600 font-semibold':''}">${d<0?-d+' overdue':d===0?'today':d}</td>
-  <td class="p-2 whitespace-nowrap"><a class="text-emerald-700 mr-2" href="inspection.html?shop=${sidOf(r)}">Inspect</a><a class="text-blue-700" href="shop.html?sid=${sidOf(r)}">Shop</a></td></tr>`).join('')||'<tr><td colspan="6" class="p-4 text-center text-slate-400">Nothing due in this range.</td></tr>';
+ const A=latest().map(r=>({r,d:daysTo(r.next)}));
+ $('dueF').innerHTML=DF.map(f=>{const n=A.filter(x=>okf(f[0],x.d)).length;return `<button onclick="dueF='${f[0]}';due()" class="px-2.5 py-1 rounded-full border ${dueF===f[0]?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-600 hover:bg-slate-50'}">${f[1]} <b class="${dueF===f[0]?'':f[0]==='over'&&n?'text-rose-600':''}">${n}</b></button>`}).join('');
+ const L=A.filter(x=>okf(dueF,x.d)).sort((a,b)=>a.d-b.d);
+ $('dueRows').innerHTML=L.map(({r,d})=>`<tr><td class="p-2 pl-4 font-medium">${esc(r.name)}<div class="text-xs text-slate-500 font-normal">${esc(r.addr)}</div></td><td class="p-2">${badge(r.grade)}</td><td class="p-2 hs">${r.date}</td>
+  <td class="p-2">${r.next}</td><td class="p-2"><span class="chip ${d<0?'bg-rose-50 text-rose-600':d<=7?'bg-amber-50 text-amber-700':'bg-slate-100 text-slate-600'}">${d<0?-d+' d overdue':d===0?'today':d+' d'}</span></td>
+  <td class="p-2 whitespace-nowrap text-right pr-4"><a class="chip bg-emerald-50 text-emerald-700 mr-1" href="inspection.html?shop=${sidOf(r)}">Inspect</a><a class="chip bg-sky-50 text-sky-700" href="shop.html?sid=${sidOf(r)}">Shop</a></td></tr>`).join('')||'<tr><td colspan="6" class="p-10 text-center text-slate-400"><div class="text-3xl mb-1">✅</div>Nothing due in this range.</td></tr>';
 }
 function year(){
  const y=$('yr').value,R=recs.filter(r=>r.date.startsWith(y)),mo=[...Array(12)].map(()=>[]);
@@ -47,22 +59,23 @@ function year(){
  const avg=a=>a.length?+(a.reduce((s,r)=>s+r.pct,0)/a.length).toFixed(1):null;
  const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
  cM&&cM.destroy();cG&&cG.destroy();
- cM=new Chart($('cM'),{data:{labels:mn,datasets:[{type:'bar',label:'Visits',data:mo.map(a=>a.length),backgroundColor:'#059669',yAxisID:'y'},{type:'line',label:'Avg %',data:mo.map(avg),borderColor:'#2563eb',yAxisID:'y1',spanGaps:true}]},
-  options:{maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}},y1:{position:'right',min:0,max:100,grid:{drawOnChartArea:false}}}}});
- const m=new Map();R.forEach(r=>{const k=pk(r);if(!m.has(k)||m.get(k).date<r.date)m.set(k,r)});const LY=[...m.values()];
- cG=new Chart($('cG'),{type:'doughnut',data:{labels:GRADES.map(x=>x.g),datasets:[{data:GRADES.map(x=>LY.filter(r=>r.grade===x.g).length),backgroundColor:GRADES.map(x=>x.col)}]},options:{maintainAspectRatio:false}});
- $('mRows').innerHTML=mo.map((a,i)=>`<tr><td class="p-1">${mn[i]}</td><td class="p-1">${a.length}</td><td class="p-1">${avg(a)??'–'}</td>${GRADES.map(x=>`<td class="p-1">${a.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`).join('')
-  +`<tr class="font-semibold bg-slate-50"><td class="p-1">${y}</td><td class="p-1">${R.length}</td><td class="p-1">${avg(R)??'–'}</td>${GRADES.map(x=>`<td class="p-1">${R.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`;
+ cM=new Chart($('cM'),{data:{labels:mn,datasets:[{type:'bar',label:'Visits',data:mo.map(a=>a.length),backgroundColor:'#0f766e',borderRadius:6,maxBarThickness:34,yAxisID:'y',order:2},{type:'line',label:'Avg %',data:mo.map(avg),borderColor:'#2563eb',backgroundColor:'#2563eb',pointRadius:4,tension:.3,spanGaps:true,yAxisID:'y1',order:1}]},
+  options:{maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top',align:'end'}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'Visits'}},y1:{position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Avg %'}}}}});
+ const m=new Map();R.forEach(r=>{const k=pk(r);if(!m.has(k)||m.get(k).date<r.date)m.set(k,r)});const LY=[...m.values()],tot=LY.length,cnt=GRADES.map(x=>LY.filter(r=>r.grade===x.g).length);
+ cG=new Chart($('cG'),{type:'doughnut',data:{labels:GRADES.map(x=>x.g),datasets:[{data:cnt,backgroundColor:GRADES.map(x=>x.col),borderWidth:3,borderColor:'#fff',hoverOffset:4}]},options:{maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false}}},
+  plugins:[{id:'ctr',afterDraw(c){const {ctx,chartArea:a}=c,x=(a.left+a.right)/2,y=(a.top+a.bottom)/2;ctx.save();ctx.textAlign='center';ctx.fillStyle='#0f172a';ctx.font='700 30px Segoe UI';ctx.fillText(tot,x,y+6);ctx.fillStyle='#64748b';ctx.font='12px Segoe UI';ctx.fillText('premises',x,y+24);ctx.restore()}}]});
+ $('gYr').textContent=y;
+ $('gLeg').innerHTML=GRADES.map((x,i)=>`<div class="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2"><span class="w-2.5 h-2.5 rounded-full flex-none" style="background:${x.col}"></span><b>${x.g}</b><span class="text-xs text-slate-500 truncate">${x.name}</span><b class="ml-auto">${cnt[i]}</b></div>`).join('');
+ const row=(l,a,b)=>`<tr${b?' class="font-semibold"':''}><td>${l}</td><td>${a.length}</td><td>${avg(a)??'–'}</td>${GRADES.map(x=>`<td>${a.filter(r=>r.grade===x.g).length}</td>`).join('')}</tr>`;
+ $('mRows').innerHTML=R.length?mo.map((a,i)=>a.length?row(mn[i],a):'').join('')+row('Total '+y,R,1):'<tr><td colspan="7" class="py-3 text-center text-slate-400">No visits in '+y+'.</td></tr>';
 }
 function catChart(){
  const L=latest(),rows=CATS.map(([k,n])=>{const a=L.filter(r=>r.cat===k);return {k,n,a,avg:a.length?+(a.reduce((s,r)=>s+r.pct,0)/a.length).toFixed(1):null}}).filter(x=>x.a.length);
- cC&&cC.destroy();cCp&&cCp.destroy();
- const lb=rows.map(x=>x.n);
- cC=new Chart($('cC'),{type:'bar',data:{labels:lb,datasets:GRADES.map(g=>({label:'Grade '+g.g,data:rows.map(x=>x.a.filter(r=>r.grade===g.g).length),backgroundColor:g.col}))},options:{maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
- const pal=['#0f766e','#2563eb','#f59e0b','#e11d48','#7c3aed','#0891b2','#64748b'];
- cCp=new Chart($('cCp'),{type:'doughnut',data:{labels:lb,datasets:[{data:rows.map(x=>x.a.length),backgroundColor:rows.map(x=>pal[CATS.findIndex(c=>c[0]===x.k)])}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
- $('catRows').innerHTML=rows.map(x=>`<tr><td class="p-1">${x.n} <span class="text-slate-400">(${x.k})</span></td><td class="p-1">${x.a.length}</td><td class="p-1">${x.avg}</td>${GRADES.map(g=>`<td class="p-1">${x.a.filter(r=>r.grade===g.g).length}</td>`).join('')}</tr>`).join('')
-  +(rows.length?`<tr class="font-semibold bg-slate-50"><td class="p-1">Total</td><td class="p-1">${L.length}</td><td class="p-1">${L.length?(L.reduce((s,r)=>s+r.pct,0)/L.length).toFixed(1):'–'}</td>${GRADES.map(g=>`<td class="p-1">${L.filter(r=>r.grade===g.g).length}</td>`).join('')}</tr>`:'<tr><td colspan="7" class="p-3 text-center text-slate-400">No inspections yet.</td></tr>');
+ cC&&cC.destroy();
+ cC=new Chart($('cC'),{type:'bar',data:{labels:rows.map(x=>x.n),datasets:GRADES.map(g=>({label:'Grade '+g.g,data:rows.map(x=>x.a.filter(r=>r.grade===g.g).length),backgroundColor:g.col,borderRadius:4,maxBarThickness:26}))},
+  options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{position:'top',align:'end'}},scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0}},y:{stacked:true,grid:{display:false}}}}});
+ const row=(l,a,v,b)=>`<tr${b?' class="font-semibold"':''}><td>${l}</td><td>${a.length}</td><td>${v??'–'}</td>${GRADES.map(g=>`<td>${a.filter(r=>r.grade===g.g).length}</td>`).join('')}</tr>`;
+ $('catRows').innerHTML=rows.length?rows.map(x=>row(x.n+' <span class="text-slate-400">('+x.k+')</span>',x.a,x.avg)).join('')+row('Total',L,L.length?+(L.reduce((s,r)=>s+r.pct,0)/L.length).toFixed(1):null,1):'<tr><td colspan="7" class="py-3 text-center text-slate-400">No inspections yet.</td></tr>';
 }
 function render(){
  const L=latest();
@@ -70,7 +83,7 @@ function render(){
  $('stats').innerHTML=st('🏪','#ccfbf1','Premises',L.length,'#0f766e')+GRADES.map(x=>st(x.g,x.col+'33',`Grade ${x.g} · ${rangeTxt(x.g)}`,L.filter(r=>r.grade===x.g).length,x.col)).join('');
  const q=$('q').value.toLowerCase();
  $('rows').innerHTML=L.filter(r=>(r.name+r.owner+(r.addr||'')).toLowerCase().includes(q)).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<tr class="hover:bg-slate-50"><td class="p-2 font-medium">${esc(r.name)}<div class="text-xs text-slate-500">${esc(r.owner)}</div></td><td class="p-2 hs">${r.cat}</td><td class="p-2 hs">${r.date}</td><td class="p-2">${r.pct}%</td><td class="p-2">${badge(r.grade)}</td>
-  <td class="p-2 ${r.next<today()?'text-rose-600 font-semibold':''}">${r.next}</td><td class="p-2 whitespace-nowrap"><a class="text-emerald-700 mr-2" href="shop.html?sid=${sidOf(r)}">Progress / QR</a><a class="text-blue-700 mr-2" href="report.html?id=${r.id}">Report</a><a class="text-slate-700" href="inspection.html?shop=${sidOf(r)}">Inspect</a></td></tr>`).join('')
+  <td class="p-2 ${r.next<today()?'text-rose-600 font-semibold':''}">${r.next}</td><td class="p-2 whitespace-nowrap"><a class="chip bg-emerald-50 text-emerald-700 mr-1" href="shop.html?sid=${sidOf(r)}">Progress / QR</a><a class="chip bg-sky-50 text-sky-700 mr-1" href="report.html?id=${r.id}">Report</a><a class="chip bg-slate-100 text-slate-700" href="inspection.html?shop=${sidOf(r)}">Inspect</a></td></tr>`).join('')
   ||'<tr><td colspan="7" class="p-6 text-center text-slate-400">No inspections yet – use “New Inspection”.</td></tr>';
 }
 async function pubAll(){let n=0;try{for(const r of latest()){await publishShop(sidOf(r));n++}alert(n+' shop(s) published to the public / owner views.')}catch(e){alert('Failed: '+e.message)}}
