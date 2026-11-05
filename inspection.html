@@ -51,7 +51,7 @@ function build(){
    <span class="text-xs">Marks: <b id="sub_${s.id}"></b></span><button type="button" id="tg_${s.id}" onclick="ON['${s.id}']=!ON['${s.id}'];recalc()" class="px-3 py-1 rounded-full text-xs font-bold"></button></div>
   <p id="off_${s.id}" class="hidden text-sm text-slate-500 p-3 text-center">Section switched OFF – not inspected, excluded from the score.</p>
   <div id="body_${s.id}">${s.na?`<label class="block text-xs p-2 mb-2 rounded bg-amber-50"><input type="checkbox" id="na_${s.id}" onchange="recalc()"> Not applicable: ${s.na.l}</label>`:''}
-  <div class="grid md:grid-cols-2 gap-3">${s.items.map(i=>`<label class="text-xs" id="w_${i[0]}">${i[1]}<select id="m_${i[0]}" onchange="recalc()" class="w-full border rounded p-2 text-sm mt-1">${i[2].map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select></label>`).join('')}</div></div></div>`).join('')+
+  <div class="grid md:grid-cols-2 gap-3">${s.items.map(i=>`<div class="text-xs" id="w_${i[0]}"><div class="font-medium mb-1">${i[1]}</div><input type="hidden" id="m_${i[0]}" value="${i[2][0][0]}"><div id="b_${i[0]}" class="grid gap-1.5 ${i[2].length==2?'grid-cols-2':'grid-cols-1'}">${i[2].map(o=>`<button type="button" data-v="${o[0]}" onclick="pick('${i[0]}',${o[0]})" class="opt border rounded-lg px-2 py-2 text-sm text-left leading-snug">${o[1]}</button>`).join('')}</div></div>`).join('')}</div></div></div>`).join('')+
  `<div id="st_final" class="hidden space-y-3"><label class="text-xs block">Remark / advice<textarea id="f_rem" rows="3" class="w-full border rounded p-2 text-sm"></textarea></label></div>`;
 }
 let tmp=null;
@@ -70,6 +70,11 @@ function closeLoc(){if(pickMap&&pickMap._stopLoc)pickMap._stopLoc();$('loc').cla
 function okLoc(){
  if(!tmp){alert('Tap the map (or press “My location”) to place the pin first.');return}
  chosen=tmp;closeLoc();updLoc();toast('✔ Location saved')}
+function paint(id){
+ const it=SECS.flatMap(s=>s.items).find(x=>x[0]===id),v=+$('m_'+id).value,mx=maxOf(it);
+ $('b_'+id).querySelectorAll('button').forEach(b=>{const on=+b.dataset.v===v,c=v===mx?'bg-emerald-600 border-emerald-600':v===0?'bg-rose-600 border-rose-600':'bg-amber-500 border-amber-500';
+  b.className='opt border rounded-lg px-2 py-2 text-sm text-left leading-snug '+(on?c+' text-white font-semibold':'bg-white text-slate-700 hover:bg-slate-50')})}
+function pick(id,v){$('m_'+id).value=v;paint(id);recalc()}
 function recalc(){
  const marks={},na={},subs={};let total=0,denom=0,n=0;
  SECS.forEach(s=>{const on=ON[s.id];na[s.id]=!!(s.na&&$('na_'+s.id).checked);let t=0,m=0;if(on)n++;
@@ -99,7 +104,7 @@ function openWiz(i){$('wiz').classList.remove('hidden');go(i)}
 function closeWiz(){if(confirm('Close the inspection? Unsaved marks will be lost.'))$('wiz').classList.add('hidden')}
 function reset(){
  ['f_name','f_addr','f_owner','f_nic','f_tel','f_rem'].forEach(i=>$(i).value='');$('f_date').value=today();
- SECS.forEach(s=>{ON[s.id]=true;if(s.na)$('na_'+s.id).checked=false;s.items.forEach(i=>$('m_'+i[0]).selectedIndex=0)});chosen=null;mark(null);updLoc();recalc();
+ SECS.forEach(s=>{ON[s.id]=true;if(s.na)$('na_'+s.id).checked=false;s.items.forEach(i=>{$('m_'+i[0]).value=i[2][0][0];paint(i[0])})});chosen=null;mark(null);updLoc();recalc();
 }
 async function finish(){
  const r=recalc();if(!r.denom){alert('Switch at least one section ON.');return}

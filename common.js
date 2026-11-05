@@ -110,7 +110,10 @@ function parseLL(t){let s=String(t).trim();try{s=decodeURIComponent(s)}catch(e){
  const m=s.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)||s.match(/!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/)||s.match(/[?&](?:q|ll|query|destination)=\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/)||s.match(/^(-?\d+\.\d+)\s*[, ]\s*(-?\d+\.\d+)$/);
  if(!m)return null;const a=+m[1],b=+m[2];return Math.abs(a)<=90&&Math.abs(b)<=180?{lat:a,lng:b}:null}
 function mapTools(map,o={}){
- const topo=tile(),street=OSM(),sat=SAT(),B={'Topo':topo,'Street':street,'Satellite':sat,'Satellite + Labels':SAT(1,1)};let k='Satellite + Labels';
+ const topo=tile(),street=OSM(),sat=SAT(),B={'Topo':topo,'Street':street,
+  'Street (detailed)':L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,detectRetina:true,attribution:'&copy; OpenStreetMap &copy; CARTO'}),
+  'Street (Esri)':L.tileLayer(ESRI('World_Street_Map'),{maxZoom:20,maxNativeZoom:19,detectRetina:true,attribution:'Tiles &copy; Esri'}),
+  'Satellite':sat,'Satellite + Labels':SAT(1,1)};let k='Satellite + Labels';
  try{k=localStorage.getItem('h800_base')||'Satellite + Labels'}catch(e){}
  (B[k]||B['Satellite + Labels']).addTo(map);
  L.control.layers(B,null,{position:'topright'}).addTo(map);
